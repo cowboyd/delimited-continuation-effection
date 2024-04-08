@@ -89,16 +89,29 @@ describe("continuation", () => {
     expect(result).toEqual(0);
   });
 
-  // it("each continuation point only fails once", () => {
-  //   let bing = 0;
-  //   let boom = evaluate<Continuation<void>>(function* () {
-  //     yield* shift(function* (k) {
-  //       return k;
-  //     });
-  //     throw new Error(`bing ${++bing}`);
-  //   });
+  it("propagates errors in top-level evaluate", () => {
+    expect(() =>
+      evaluate(function* () {
+        throw new Error("boom!");
+      })
+    ).toThrow("boom!");
+  });
 
-  //   assertThrows(() => evaluate(() => boom()), Error, "bing 1");
-  //   assertEquals(undefined, evaluate(() => boom()));
-  // });
+  it("allows catching of errors through multiple shift/reset boundaries", () => {
+    let result = evaluate(function* () {
+      try {
+        return yield* reset(function* () {
+          return yield* shift(function* () {
+            throw new Error("boom!");
+          });
+        });
+      } catch (error) {
+        return error;
+      }
+    });
+
+    expect(result).toMatchObject({
+      message: "boom!",
+    });
+  });
 });
