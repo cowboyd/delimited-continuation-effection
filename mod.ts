@@ -19,7 +19,7 @@ export type Instruction = {
   value: unknown;
 };
 
-interface Continuation<T, R> {
+export interface Continuation<T, R> {
   (value: T): Operation<R>;
 }
 
@@ -44,8 +44,8 @@ export function reset<T>(block: () => Operation<unknown>): Operation<T> {
   };
 }
 
-export function shift<T, R>(
-  block: (k: Continuation<T, R>) => Operation<R>,
+export function shift<T, R, O>(
+  block: (k: Continuation<T, R>) => Operation<O>,
 ): Operation<T> {
   return {
     *[Symbol.iterator]() {
@@ -58,10 +58,9 @@ export function evaluate<TArgs extends unknown[]>(
   op: (...args: TArgs) => Operation<unknown>,
   ...args: TArgs
 ): unknown {
-  let frame = new Frame();
+  let frame = new Frame("evaluate");
   return reduce([
-    new Destroy(frame),
-    new Resume(op(...args)[Symbol.iterator](), new Frame())
+    new Resume(op(...args)[Symbol.iterator](), frame),
   ]);
 }
 
@@ -77,13 +76,33 @@ function reduce(stack: Thunk[]): unknown {
       if (next.done) {
         stack.push(new Return(next.value));
       } else {
-	const instruction = next.value;
-	if (instruction.type === "shift") {
-	  let { block } = instruction;
-	  stack.push(new Resume(instructions, frame));
-	  //@ts-expect-error no argument yet
-	  stack.push(new Resume(block()[Symbol.iterator](), frame));
-	}
+        const instruction = next.value;
+        if (instruction.type === "shift") {
+          let { block } = instruction;
+          let result: Result<unknown> | undefined = void 0;
+          const k: Continuation<unknown, unknown> = (value) => ({
+            *[Symbol.iterator]() {
+              if (result) {
+                return result;
+              } else {
+                stack.push(
+                  new Resume(instructions, frame),
+                  new Return(result = Ok(value)),
+                );
+              }
+            },
+          });
+
+          stack.push(
+            new Resume(block(k)[Symbol.iterator](), new Frame("shift")),
+          );
+        } else if (instruction.type === "reset") {
+          let { block } = instruction;
+          stack.push(
+            new Resume(instructions, frame),
+            new Resume(block()[Symbol.iterator](), new Frame("reset")),
+          );
+        }
       }
     } else if (thunk.type === "return") {
       result = thunk.result;
@@ -96,20 +115,27 @@ function reduce(stack: Thunk[]): unknown {
   }
 }
 
-function iterate(resume: Resume, result: Result<unknown>): IteratorResult<Instruction, Result<unknown>> {
+function iterate(
+  resume: Resume,
+  result: Result<unknown>,
+): IteratorResult<Instruction, Result<unknown>> {
   let { instructions } = resume;
   try {
     if (result.ok) {
       let next = instructions.next(result.value);
-      return next.done ? { done: true, value: Ok(next.value) } : { done: false, value: next.value };
+      return next.done
+        ? { done: true, value: Ok(next.value) }
+        : { done: false, value: next.value };
     } else if (instructions.throw) {
       let next = instructions.throw(result.error);
-      return next.done ? { done: true, value: Ok(next.value) } : { done: false, value: next.value };
+      return next.done
+        ? { done: true, value: Ok(next.value) }
+        : { done: false, value: next.value };
     } else {
       return { done: true, value: result };
     }
   } catch (error) {
-    return { done: true, value: Err(error) }
+    return { done: true, value: Err(error) };
   }
 }
 
@@ -138,20 +164,9 @@ class Return {
   constructor(public result: Result<unknown>) {}
 }
 
-class Destroy {
-  type = "destroy" as const;
-  constructor(public frame: Frame) {}
-}
-
 class Frame {
-  parent?: Frame;
   children = new Set<Frame>();
-  constructor(parent?: Frame) {
-    this.parent = parent;
-    if (parent) {
-      parent.children.add(this);
-    }
-  }
+  constructor(public readonly name: string, public readonly parent?: Frame) {}
 }
 
 type Result<T> = {

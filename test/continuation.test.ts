@@ -1,7 +1,7 @@
-import { describe, it } from "jsr:@std/testing/bdd";
+import { describe, it } from "jsr:@std/testing@0.221.0/bdd";
 import { expect } from "jsr:@std/expect";
 
-import { Operation, evaluate, reset, shift } from "../mod.ts";
+import { Continuation, evaluate, Operation, reset, shift } from "../mod.ts";
 
 describe("continuation", () => {
   it("evaluates synchronous values synchronously", () => {
@@ -35,44 +35,59 @@ describe("continuation", () => {
     expect(evaluate(() => times([8, 1, 5, 2, 3]))).toEqual(240);
   });
 
-  // it("each continuation point function only resumes once", () => {
-  //   let beginning, middle, end;
-  //   let next = evaluate<Continuation<string, Continuation<number>>>(
-  //     function* () {
-  //       beginning = true;
-  //       middle = yield* shift(function* (k) {
-  //         return k;
-  //       });
-  //       end = yield* shift<number>(function* (k) {
-  //         return k;
-  //       });
-  //       return end * 10;
-  //     },
-  //   );
+  it("can invoke a continuation later", async () => {
+  });
 
-  //   assertEquals(true, beginning);
-  //   assertEquals(undefined, middle);
+  it("returns the value of the following shift point when continuing ", () => {
+    let num = evaluate(function* () {
+      let k = yield* reset<Continuation<number, number>>(function* () {
+        let result = yield* shift<number, number, Continuation<number, number>>(
+          function* (k) {
+            return k;
+          },
+        );
 
-  //   let last = evaluate<(val: number) => Computation<number>>(() =>
-  //     next("reached middle")
-  //   );
-  //   assertEquals("reached middle", middle);
-  //   assertEquals(undefined, end);
-  //   assertEquals("function", typeof last);
+        return yield* shift(function* () {
+          return result * 2;
+        });
+      });
+      return yield* k(5);
+    });
+    expect(num).toEqual(10);
+  });
 
-  //   let second = evaluate(() => next("continue"));
-  //   assertEquals("reached middle", middle);
-  //   assertEquals(undefined, end);
-  //   assertEquals(void 0, second);
+  it("can recurse to arbirtary depths without overflowing the call stack", () => {
+    let result = evaluate(function* run() {
+      let sum = 0;
+      for (let i = 0; i < 100_000; i++) {
+        sum += yield* shift<1, number, number>(function* incr(k) {
+          return yield* k(1);
+        });
+      }
+      return sum;
+    });
+    expect(result).toEqual(100_000);
+  });
 
-  //   let result = evaluate(() => last(10));
-  //   assertEquals(10, end);
-  //   assertEquals(100, result);
-
-  //   let result2 = evaluate(() => last(100));
-  //   assertEquals(10, end);
-  //   assertEquals(undefined, result2);
-  // });
+  it("each continuation point function only resumes once", () => {
+    let result = evaluate(function* () {
+      let k = yield* reset<Continuation<void, number>>(function* () {
+        yield* shift<number, unknown, unknown>(function* (k) {
+          return k;
+        });
+        for (let i = 0;; i++) {
+          yield* shift(function* () {
+            return i;
+          });
+        }
+      });
+      yield* k();
+      yield* k();
+      yield* k();
+      return yield* k();
+    });
+    expect(result).toEqual(0);
+  });
 
   // it("each continuation point only fails once", () => {
   //   let bing = 0;
@@ -85,35 +100,5 @@ describe("continuation", () => {
 
   //   assertThrows(() => evaluate(() => boom()), Error, "bing 1");
   //   assertEquals(undefined, evaluate(() => boom()));
-  // });
-
-  // it("returns the value of the following shift point when continuing ", () => {
-  //   let { k } = evaluate<{ k: Continuation<unknown> }>(function* () {
-  //     let k = yield* reset(function* () {
-  //       let result = yield* shift<number>(function* (k) {
-  //         return k;
-  //       });
-
-  //       return yield* shift(function* () {
-  //         return result * 2;
-  //       });
-  //     });
-  //     return { k };
-  //   });
-  //   assertEquals("function", typeof k);
-  //   assertEquals(10, evaluate(() => k(5)));
-  // });
-
-  // it.ignore("can recurse to arbirtary depths without overflowing the call stack", () => {
-  //   let result = evaluate(function* run() {
-  //     let sum = 0;
-  //     for (let i = 0; i < 100_000; i++) {
-  //       sum += yield* shift<1, number>(function* incr(k) {
-  //         return yield* k(1);
-  //       });
-  //     }
-  //     return sum;
-  //   });
-  //   expect(result).toEqual(100_000);
   // });
 });
