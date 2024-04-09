@@ -114,4 +114,22 @@ describe("continuation", () => {
       message: "boom!",
     });
   });
+
+  it.ignore("tears down subroutines before returning", () => {
+    let teardown: string[] = [];
+    evaluate(function* () {
+      yield* reset(function* () {
+        try {
+          yield* shift(function* () {});
+        } finally {
+          teardown.push("one");
+        }
+      });
+    });
+    expect(teardown).toEqual(["one"]);
+  });
+
+  it("fails if an error occurs in teardown rather than return a value", () => {});
+
+  it("does not execute code that is already in a dead zone", () => {});
 });

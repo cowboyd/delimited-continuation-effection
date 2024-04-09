@@ -15,25 +15,12 @@ export type Instruction = {
 } | {
   type: "continue";
   instructions: Iterator<Instruction, unknown, unknown>;
-  frame: Frame;
+  frame: Routine;
   value: unknown;
 };
 
 export interface Continuation<T, R> {
   (value: T): Operation<R>;
-}
-
-export function scoped<T>(block: () => Operation<T>): Operation<T> {
-  return {
-    *[Symbol.iterator]() {
-      yield { type: "pushscope" };
-      try {
-        return yield* block();
-      } finally {
-        yield { type: "popscope" };
-      }
-    },
-  };
 }
 
 export function reset<T>(block: () => Operation<unknown>): Operation<T> {
@@ -58,9 +45,9 @@ export function evaluate<TArgs extends unknown[]>(
   op: (...args: TArgs) => Operation<unknown>,
   ...args: TArgs
 ): unknown {
-  let frame = new Frame("evaluate");
+  let routine = new Routine("evaluate", op(...args)[Symbol.iterator]());
   return reduce([
-    new Resume(op(...args)[Symbol.iterator](), frame),
+    new Resume(routine),
   ]);
 }
 
@@ -71,43 +58,53 @@ function reduce(stack: Thunk[]): unknown {
     if (!thunk) {
       return unbox(result);
     } else if (thunk.type === "resume") {
-      let { instructions, frame } = thunk;
-      const next = iterate(thunk, result);
+      let { routine } = thunk;
+      const next = iterate(routine, result);
       if (next.done) {
-        stack.push(new Return(next.value));
+        stack.push(new Return(routine, next.value));
       } else {
         const instruction = next.value;
         if (instruction.type === "shift") {
           let { block } = instruction;
           let result: Result<unknown> | undefined = void 0;
+          let subroutine: Routine | undefined = void 0;
           const k: Continuation<unknown, unknown> = (value) => ({
             *[Symbol.iterator]() {
               if (result) {
                 return result;
               } else {
+                result = Ok(value);
                 stack.push(
-                  new Resume(instructions, frame),
-                  new Return(result = Ok(value)),
+                  new Resume(routine),
+                  new Return(subroutine!, result),
                 );
               }
             },
           });
-
+          subroutine = new Routine(
+            `shift ${block.name}()`,
+            block(k)[Symbol.iterator](),
+            routine,
+          );
           stack.push(
-            new Resume(block(k)[Symbol.iterator](), new Frame("shift")),
+            new Resume(subroutine),
           );
         } else if (instruction.type === "reset") {
           let { block } = instruction;
           stack.push(
-            new Resume(instructions, frame),
-            new Resume(block()[Symbol.iterator](), new Frame("reset")),
+            new Resume(routine),
+            new Resume(
+              new Routine(
+                `reset ${block.name}()`,
+                block()[Symbol.iterator](),
+                routine,
+              ),
+            ),
           );
         }
       }
     } else if (thunk.type === "return") {
       result = thunk.result;
-    } else if (thunk.type === "destroy") {
-      //      console.log({ thunk });
     } else {
       //@ts-ignore-error it is good for TS to be unhappy about this
       throw new Error(`unknown thunk type: ${thunk.type}`);
@@ -116,57 +113,53 @@ function reduce(stack: Thunk[]): unknown {
 }
 
 function iterate(
-  resume: Resume,
-  result: Result<unknown>,
+  routine: Routine,
+  current: Result<unknown>,
 ): IteratorResult<Instruction, Result<unknown>> {
-  let { instructions } = resume;
+  let { instructions } = routine;
   try {
-    if (result.ok) {
-      let next = instructions.next(result.value);
+    if (current.ok) {
+      let next = instructions.next(current.value);
       return next.done
         ? { done: true, value: Ok(next.value) }
         : { done: false, value: next.value };
     } else if (instructions.throw) {
-      let next = instructions.throw(result.error);
+      let next = instructions.throw(current.error);
       return next.done
         ? { done: true, value: Ok(next.value) }
         : { done: false, value: next.value };
     } else {
-      return { done: true, value: result };
+      return { done: true, value: current };
     }
   } catch (error) {
     return { done: true, value: Err(error) };
   }
 }
 
-type Thunk = {
-  readonly type: "resume";
-  readonly instructions: Iterator<Instruction, unknown, unknown>;
-  readonly frame: Frame;
-} | {
-  type: "return";
-  result: Result<unknown>;
-} | {
-  type: "destroy";
-  frame: Frame;
-};
+type Thunk = Resume | Return;
 
 class Resume {
   type = "resume" as const;
-  constructor(
-    public instructions: Iterator<Instruction, unknown, unknown>,
-    public frame: Frame,
-  ) {}
+  constructor(public readonly routine: Routine) {}
 }
 
 class Return {
   type = "return" as const;
-  constructor(public result: Result<unknown>) {}
+  constructor(
+    public readonly routine: Routine,
+    public result: Result<unknown>,
+  ) {}
 }
 
-class Frame {
-  children = new Set<Frame>();
-  constructor(public readonly name: string, public readonly parent?: Frame) {}
+class Routine {
+  subroutines = new Set<Routine>();
+  constructor(
+    public readonly name: string,
+    public readonly instructions: Iterator<Instruction, unknown, unknown>,
+    public readonly parent?: Routine,
+  ) {
+    this.parent?.subroutines.add(this);
+  }
 }
 
 type Result<T> = {
