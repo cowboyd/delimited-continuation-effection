@@ -6,7 +6,11 @@ export type Result<T> = {
   error: Error;
 };
 
-export const Ok = <T>(value: T): Result<T> => ({ ok: true, value });
+export function Ok(): Result<void>;
+export function Ok<T>(value: T): Result<T>;
+export function Ok<T>(value?: T): Result<T | undefined> {
+  return ({ ok: true, value });
+}
 
 export const Err = <T>(error: Error): Result<T> => ({ ok: false, error });
 
