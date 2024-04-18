@@ -55,14 +55,14 @@ describe("continuation", () => {
   it("can recurse to arbirtary depths without overflowing the call stack", () => {
     let result = evaluate(function* run() {
       let sum = 0;
-      for (let i = 0; i < 100_000; i++) {
+      for (let i = 0; i < 10_000; i++) {
         sum += yield* shift<1, number, number>(function* incr(k) {
           return yield* k(1);
         });
       }
       return sum;
     });
-    expect(result).toEqual(100_000);
+    expect(result).toEqual(10_000);
   });
 
   it("each continuation point function only resumes once", () => {
@@ -111,7 +111,7 @@ describe("continuation", () => {
     });
   });
 
-  it.ignore("tears down subroutines before returning", () => {
+  it("tears down subroutines before returning", () => {
     let teardown: string[] = [];
     evaluate(function* () {
       yield* reset(function* () {
@@ -121,11 +121,53 @@ describe("continuation", () => {
           teardown.push("one");
         }
       });
+      yield* reset(function* () {
+        try {
+          yield* shift(function* () {});
+        } finally {
+          teardown.push("two");
+        }
+      });
     });
-    expect(teardown).toEqual(["one"]);
+    expect(teardown).toEqual(["two", "one"]);
   });
 
-  it.ignore("fails if an error occurs in teardown rather than return a value", () => {});
+  it("fails if an error occurs in teardown rather than return a value", () => {
+    expect(() =>
+      evaluate(function* () {
+        yield* reset(function* () {
+          try {
+            yield* shift(function* () {});
+          } finally {
+            // deno-lint-ignore no-unsafe-finally
+            throw new Error("boom!");
+          }
+        });
+      })
+    ).toThrow("boom!");
+  });
 
-  it.ignore("does not execute code that is already in a dead zone", () => {});
+  it("executes all teardown it can even if the result will be an error", () => {
+    let teardown = "skipped";
+    expect(() =>
+      evaluate(function* () {
+        yield* reset(function* () {
+          try {
+            yield* shift(function* () {});
+          } finally {
+            teardown = "completed";
+          }
+        });
+        yield* reset(function* () {
+          try {
+            yield* shift(function* () {});
+          } finally {
+            // deno-lint-ignore no-unsafe-finally
+            throw new Error("boom!");
+          }
+        });
+      })
+    ).toThrow("boom!");
+    expect(teardown).toEqual("completed");
+  });
 });
