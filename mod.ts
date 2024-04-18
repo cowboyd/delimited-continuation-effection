@@ -1,4 +1,3 @@
-import { assertInstanceOf } from "jsr:@std/assert@^0.221.0/assert-instance-of";
 import { Err, Ok, type Result, unbox } from "./result.ts";
 
 export interface Operation<T> {
@@ -10,10 +9,18 @@ export type Instruction = {
   block(): Operation<unknown>;
 } | {
   type: "shift";
-  block(k: Continuation<unknown, unknown>): Operation<unknown>;
+  block(
+    k: Continuation<unknown, unknown>,
+    // deno-lint-ignore no-explicit-any
+    reenter: ReEnter<any>,
+  ): Operation<unknown>;
 } | {
   type: "suspend";
 };
+
+export interface ReEnter<T> {
+  (k: Continuation<T, unknown>, value: T): void;
+}
 
 export interface Continuation<T, R> {
   (value: T): Operation<R>;
@@ -28,7 +35,7 @@ export function reset<T>(block: () => Operation<unknown>): Operation<T> {
 }
 
 export function shift<T, R, O>(
-  block: (k: Continuation<T, R>) => Operation<O>,
+  block: (k: Continuation<T, R>, reenter: ReEnter<T>) => Operation<O>,
 ): Operation<T> {
   return {
     *[Symbol.iterator]() {
@@ -42,57 +49,73 @@ export function evaluate<TArgs extends unknown[]>(
   ...args: TArgs
 ): unknown {
   let routine = new Routine("evaluate", op(...args));
-  return reduce(routine);
+  return reduce([routine], Ok());
 }
 
-function reduce(routine: Routine): unknown {
-  let stack: Array<Routine | Reset> = [routine];
-  let register: Result<unknown> = Ok();
-  let current = stack.pop();
-  while (current && !(current instanceof Reset)) {
-    const next = iterate(current, register);
-    if (next.done) {
-      const result = next.value;
-      current.parent?.subroutines.delete(current);
-      register = result;
-      if (current.subroutines.size) {
-        stack.push(id(result), ...[...current.subroutines].map(exit));
-      }
-    } else {
-      stack.push(current);
-      const instruction = next.value;
-      if (instruction.type === "reset") {
-        let { block } = instruction;
-        stack.push(
-          new Reset(),
-          new Routine(instruction.block.name ?? "reset", block(), current),
-        );
-      } else if (instruction.type === "shift") {
-        let { block } = instruction;
-        let frames: Routine[] = [];
-        let top = stack.pop();
-        while (top && !(top instanceof Reset)) {
-          frames.unshift(top);
-          top = stack.pop();
-        }
+function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
+  let reducing = true;
 
-        let k: Continuation<unknown, unknown> = (value: unknown) => ({
-          *[Symbol.iterator]() {
-            register = Ok(value);
-            stack.push(new Reset(), ...frames);
-            return (yield { type: "suspend" }) as unknown;
-          },
-        });
-        stack.push(
-          new Routine(instruction.block.name ?? "shift", block(k), current),
-        );
-      } else if (instruction.type === "suspend") {
-        stack.pop();
+  try {
+    let register = value;
+    let reenter = (k: Continuation<unknown, unknown>, value: unknown) => {
+      let resume = new Routine(`reenter`, k(value));
+      stack.push(resume);
+      if (!reducing) {
+        reduce(stack, Ok(value));
       }
+    };
+
+    let current = stack.pop();
+    while (current && !(current instanceof Reset)) {
+      const next = iterate(current, register);
+      if (next.done) {
+        const result = next.value;
+        current.parent?.subroutines.delete(current);
+        register = result;
+        if (current.subroutines.size) {
+          stack.push(id(result), ...[...current.subroutines].map(exit));
+        }
+      } else {
+        stack.push(current);
+        const instruction = next.value;
+        if (instruction.type === "reset") {
+          let { block } = instruction;
+          stack.push(
+            new Reset(),
+            new Routine(instruction.block.name ?? "reset", block(), current),
+          );
+        } else if (instruction.type === "shift") {
+          let { block } = instruction;
+          let frames: Routine[] = [];
+          let top = stack.pop();
+          while (top && !(top instanceof Reset)) {
+            frames.unshift(top);
+            top = stack.pop();
+          }
+          let k: Continuation<unknown, unknown> = (value: unknown) => ({
+            *[Symbol.iterator]() {
+              register = Ok(value);
+              stack.push(new Reset(), ...frames);
+              return (yield { type: "suspend" }) as unknown;
+            },
+          });
+          stack.push(
+            new Routine(
+              instruction.block.name ?? "shift",
+              block(k, reenter),
+              current,
+            ),
+          );
+        } else if (instruction.type === "suspend") {
+          stack.pop();
+        }
+      }
+      current = stack.pop();
     }
-    current = stack.pop();
+    return unbox(register);
+  } finally {
+    reducing = false;
   }
-  return unbox(register);
 }
 
 function iterate(

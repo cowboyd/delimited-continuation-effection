@@ -18,6 +18,17 @@ describe("continuation", () => {
     })).toEqual(5);
   });
 
+  it.ignore("can invoke a continuation immediately", () => {
+    expect(evaluate(function* () {
+      return yield* reset(function* () {
+        yield* shift<void, number, number>(function* (k) {
+          return 2 * (yield* k());
+        });
+        return 5;
+      });
+    })).toEqual(5);
+  });
+
   it("can exit early from  recursion", () => {
     function* times([first, ...rest]: number[]): Operation<number> {
       if (first === 0) {
@@ -169,5 +180,28 @@ describe("continuation", () => {
       })
     ).toThrow("boom!");
     expect(teardown).toEqual("completed");
+  });
+
+  it("can be re-entered from external code", () => {
+    let result = "nothing";
+    let { k, reenter } = evaluate(function* () {
+      result = yield* shift<string, unknown, unknown>(function* (k, reenter) {
+        return { reenter, k };
+      });
+      // deno-lint-ignore no-explicit-any
+    }) as any;
+    reenter(k, "hello");
+    expect(result).toEqual("hello");
+  });
+
+  it("can re-enter from within a reducing stack", () => {
+    let result = "nothing";
+    evaluate(function* () {
+      result = yield* shift<string, unknown, unknown>(function* (k, reenter) {
+        reenter(k, "hello");
+      });
+    });
+
+    expect(result).toEqual("hello");
   });
 });
