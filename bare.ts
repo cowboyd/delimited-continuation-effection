@@ -1,7 +1,8 @@
+// deno-lint-ignore-file no-explicit-any
 import { Err, Ok, type Result, unbox } from "./result.ts";
 
 export interface Operation<T> {
-  [Symbol.iterator](): Iterator<Instruction, T, unknown>;
+  [Symbol.iterator](): Iterator<Instruction, T, any>;
 }
 
 export type Instruction = {
@@ -10,8 +11,7 @@ export type Instruction = {
 } | {
   type: "shift";
   block(
-    k: Continuation<unknown, unknown>,
-    // deno-lint-ignore no-explicit-any
+    k: Continuation<unknown>,
     reenter: ReEnter<any>,
   ): Operation<unknown>;
 } | {
@@ -19,29 +19,21 @@ export type Instruction = {
 };
 
 export interface ReEnter<T> {
-  (k: Continuation<T, unknown>, value: T): void;
+  (k: Continuation<T>, value: T): void;
 }
 
-export interface Continuation<T, R> {
-  (value: T): Operation<R>;
+export interface Continuation<T> {
+  (value: T): Instruction;
 }
 
-export function reset<T>(block: () => Operation<unknown>): Operation<T> {
-  return {
-    *[Symbol.iterator]() {
-      return (yield { type: "reset", block }) as T;
-    },
-  };
+export function reset(block: () => Operation<unknown>): Instruction {
+  return { type: "reset", block };
 }
 
-export function shift<T, R, O>(
-  block: (k: Continuation<T, R>, reenter: ReEnter<T>) => Operation<O>,
-): Operation<T> {
-  return {
-    *[Symbol.iterator]() {
-      return (yield { type: "shift", block }) as T;
-    },
-  };
+export function shift<T>(
+  block: (k: Continuation<T>, reenter: ReEnter<T>) => Operation<unknown>,
+): Instruction {
+  return { type: "shift", block };
 }
 
 export function evaluate<TArgs extends unknown[]>(
@@ -57,8 +49,10 @@ function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
 
   try {
     let register = value;
-    let reenter = (k: Continuation<unknown, unknown>, value: unknown) => {
-      let resume = new Routine(`reenter`, k(value));
+    let reenter = (k: Continuation<unknown>, value: unknown) => {
+      let resume = new Routine(`reenter`, function*(): Operation<unknown> {
+	return yield k(value);
+      }());
       stack.push(resume);
       if (!reducing) {
         reduce(stack, Ok(value));
@@ -92,13 +86,11 @@ function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
             frames.unshift(top);
             top = stack.pop();
           }
-          let k: Continuation<unknown, unknown> = (value: unknown) => ({
-            *[Symbol.iterator]() {
-              register = Ok(value);
-              stack.push(new Reset(), ...frames);
-              return (yield { type: "suspend" }) as unknown;
-            },
-          });
+          let k: Continuation<unknown> = (value: unknown) => {
+            register = Ok(value);
+            stack.push(new Reset(), ...frames);
+            return { type: "suspend" };
+          };
           stack.push(
             new Routine(
               instruction.block.name ?? "shift",
@@ -159,8 +151,10 @@ class Routine {
 
 function id(value: Result<unknown>): Routine {
   return new Routine(`id ${JSON.stringify(value)}`, {
-    *[Symbol.iterator]() {
-      return unbox(value);
+    [Symbol.iterator]() {
+      return {
+	next: () => ({ done: true, value: unbox(value) })
+      };
     },
   });
 }
