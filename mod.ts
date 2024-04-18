@@ -10,6 +10,8 @@ export type Instruction = {
 } | {
   type: "shift";
   block(k: Continuation<unknown, unknown>): Operation<unknown>;
+} | {
+  type: "suspend";
 };
 
 export interface Continuation<T, R> {
@@ -38,71 +40,53 @@ export function evaluate<TArgs extends unknown[]>(
   op: (...args: TArgs) => Operation<unknown>,
   ...args: TArgs
 ): unknown {
-  let routine = new Routine("evaluate", op(...args)[Symbol.iterator]());
-  return reduce([
-    new Resume(routine),
-  ]);
+  let routine = new Routine("evaluate", op(...args));
+  return reduce(routine);
 }
 
-function reduce(stack: Thunk[]): unknown {
-  let result = Ok<unknown>(void 0);
-  while (true) {
-    let thunk = stack.pop();
-    if (!thunk) {
-      return unbox(result);
-    } else if (thunk.type === "resume") {
-      let { routine } = thunk;
-      const next = iterate(routine, result);
-      if (next.done) {
-        stack.push(new Return(routine, next.value));
-      } else {
-        const instruction = next.value;
-        if (instruction.type === "shift") {
-          let { block } = instruction;
-          let result: Result<unknown> | undefined = void 0;
-          let subroutine: Routine | undefined = void 0;
-          const k: Continuation<unknown, unknown> = (value) => ({
-            *[Symbol.iterator]() {
-              if (result) {
-                return result;
-              } else {
-                result = Ok(value);
-                stack.push(
-                  new Resume(routine),
-                  new Return(subroutine!, result),
-                );
-              }
-            },
-          });
-          subroutine = new Routine(
-            `shift ${block.name}()`,
-            block(k)[Symbol.iterator](),
-            routine,
-          );
-          stack.push(
-            new Resume(subroutine),
-          );
-        } else if (instruction.type === "reset") {
-          let { block } = instruction;
-          stack.push(
-            new Resume(routine),
-            new Resume(
-              new Routine(
-                `reset ${block.name}()`,
-                block()[Symbol.iterator](),
-                routine,
-              ),
-            ),
-          );
-        }
-      }
-    } else if (thunk.type === "return") {
-      result = thunk.result;
+function reduce(routine: Routine): unknown {
+  let stack: Array<Routine | Reset> = [routine];
+  let register: Result<unknown> = Ok();
+  let current = stack.pop();
+  while (current && !(current instanceof Reset)) {
+    const next = iterate(current, register);
+    if (next.done) {
+      register = next.value;
     } else {
-      //@ts-ignore-error it is good for TS to be unhappy about this
-      throw new Error(`unknown thunk type: ${thunk.type}`);
+      stack.push(current);
+      const instruction = next.value;
+      if (instruction.type === "reset") {
+        let { block } = instruction;
+        stack.push(
+          new Reset(),
+          new Routine(instruction.block.name ?? "reset", block()),
+        );
+      } else if (instruction.type === "shift") {
+        let { block } = instruction;
+        let frames: Routine[] = [];
+        let top = stack.pop();
+        while (top && !(top instanceof Reset)) {
+          frames.unshift(top);
+          top = stack.pop();
+        }
+
+        let k: Continuation<unknown, unknown> = (value: unknown) => ({
+          *[Symbol.iterator]() {
+            register = Ok(value);
+            stack.push(new Reset(), ...frames);
+            return (yield { type: "suspend" }) as unknown;
+          },
+        });
+        stack.push(
+          new Routine(instruction.block.name ?? "shift", block(k)),
+        );
+      } else if (instruction.type === "suspend") {
+        stack.pop();
+      }
     }
+    current = stack.pop();
   }
+  return unbox(register);
 }
 
 function iterate(
@@ -129,28 +113,17 @@ function iterate(
   }
 }
 
-type Thunk = Resume | Return;
-
-class Resume {
-  type = "resume" as const;
-  constructor(public readonly routine: Routine) {}
-}
-
-class Return {
-  type = "return" as const;
-  constructor(
-    public readonly routine: Routine,
-    public result: Result<unknown>,
-  ) {}
-}
+class Reset {}
 
 class Routine {
+  public readonly instructions: Iterator<Instruction, unknown, unknown>;
   subroutines = new Set<Routine>();
   constructor(
     public readonly name: string,
-    public readonly instructions: Iterator<Instruction, unknown, unknown>,
+    instructions: Iterable<Instruction>,
     public readonly parent?: Routine,
   ) {
+    this.instructions = instructions[Symbol.iterator]();
     this.parent?.subroutines.add(this);
   }
 }

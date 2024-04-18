@@ -35,9 +35,6 @@ describe("continuation", () => {
     expect(evaluate(() => times([8, 1, 5, 2, 3]))).toEqual(240);
   });
 
-  it("can invoke a continuation later", async () => {
-  });
-
   it("returns the value of the following shift point when continuing ", () => {
     let num = evaluate(function* () {
       let k = yield* reset<Continuation<number, number>>(function* () {
@@ -46,8 +43,7 @@ describe("continuation", () => {
             return k;
           },
         );
-
-        return yield* shift(function* () {
+        yield* shift(function* () {
           return result * 2;
         });
       });
@@ -129,7 +125,7 @@ describe("continuation", () => {
     expect(teardown).toEqual(["one"]);
   });
 
-  it("fails if an error occurs in teardown rather than return a value", () => {});
+  it.ignore("fails if an error occurs in teardown rather than return a value", () => {});
 
-  it("does not execute code that is already in a dead zone", () => {});
+  it.ignore("does not execute code that is already in a dead zone", () => {});
 });
