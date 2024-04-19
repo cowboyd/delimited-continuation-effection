@@ -1,4 +1,4 @@
-import { describe, it } from "jsr:@std/testing@0.221.0/bdd";
+import { describe, it } from "https://deno.land/std@0.223.0/testing/bdd.ts";
 import { expect } from "jsr:@std/expect";
 
 import { Continuation, evaluate, Operation, reset, shift } from "../mod.ts";
@@ -16,6 +16,19 @@ describe("continuation", () => {
         return 5;
       });
     })).toEqual(5);
+  });
+
+  it("always passes reset points synchronously", () => {
+    let reached = false;
+    expect(evaluate(function* () {
+      yield* reset(function* () {
+      });
+      yield* reset(function* () {
+      });
+      reached = true;
+    }));
+
+    expect(reached).toEqual(true);
   });
 
   it.ignore("can invoke a continuation immediately", () => {

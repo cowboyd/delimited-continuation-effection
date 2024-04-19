@@ -1,48 +1,7 @@
 import { Err, Ok, type Result, unbox } from "./result.ts";
-
-export interface Operation<T> {
-  [Symbol.iterator](): Iterator<Instruction, T, unknown>;
-}
-
-export type Instruction = {
-  type: "reset";
-  block(): Operation<unknown>;
-} | {
-  type: "shift";
-  block(
-    k: Continuation<unknown, unknown>,
-    // deno-lint-ignore no-explicit-any
-    reenter: ReEnter<any>,
-  ): Operation<unknown>;
-} | {
-  type: "suspend";
-};
-
-export interface ReEnter<T> {
-  (k: Continuation<T, unknown>, value: T): void;
-}
-
-export interface Continuation<T, R> {
-  (value: T): Operation<R>;
-}
-
-export function reset<T>(block: () => Operation<unknown>): Operation<T> {
-  return {
-    *[Symbol.iterator]() {
-      return (yield { type: "reset", block }) as T;
-    },
-  };
-}
-
-export function shift<T, R, O>(
-  block: (k: Continuation<T, R>, reenter: ReEnter<T>) => Operation<O>,
-): Operation<T> {
-  return {
-    *[Symbol.iterator]() {
-      return (yield { type: "shift", block }) as T;
-    },
-  };
-}
+import { Continuation, Instruction, Operation } from "./types.ts";
+export * from "./types.ts";
+export * from "./continuation.ts";
 
 export function evaluate<TArgs extends unknown[]>(
   op: (...args: TArgs) => Operation<unknown>,
@@ -66,7 +25,11 @@ function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
     };
 
     let current = stack.pop();
-    while (current && !(current instanceof Reset)) {
+    while (current) {
+      if (current instanceof Reset) {
+        current = stack.pop();
+        continue;
+      }
       const next = iterate(current, register);
       if (next.done) {
         const result = next.value;
@@ -100,6 +63,7 @@ function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
             },
           });
           stack.push(
+            new Reset(),
             new Routine(
               instruction.block.name ?? "shift",
               block(k, reenter),
