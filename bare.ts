@@ -50,9 +50,12 @@ function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
   try {
     let register = value;
     let reenter = (k: Continuation<unknown>, value: unknown) => {
-      let resume = new Routine(`reenter`, function*(): Operation<unknown> {
-	return yield k(value);
-      }());
+      let resume = new Routine(
+        `reenter`,
+        function* (): Operation<unknown> {
+          return yield k(value);
+        }(),
+      );
       stack.push(resume);
       if (!reducing) {
         reduce(stack, Ok(value));
@@ -153,7 +156,7 @@ function id(value: Result<unknown>): Routine {
   return new Routine(`id ${JSON.stringify(value)}`, {
     [Symbol.iterator]() {
       return {
-	next: () => ({ done: true, value: unbox(value) })
+        next: () => ({ done: true, value: unbox(value) }),
       };
     },
   });

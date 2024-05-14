@@ -1,160 +1,188 @@
-import { Err, Ok, type Result, unbox } from "./result.ts";
-import { Continuation, Instruction, Operation } from "./types.ts";
+import { Just, Maybe, None } from "./maybe.ts";
+import { box, Err, Ok, type Result } from "./result.ts";
+import { suspend } from "./suspend.ts";
+import { Instruction, Operation, Resolve } from "./types.ts";
 export * from "./types.ts";
-export * from "./continuation.ts";
+export * from "./sleep.ts";
+export * from "./suspend.ts";
+export * from "./run.ts";
 
-export function evaluate<TArgs extends unknown[]>(
-  op: (...args: TArgs) => Operation<unknown>,
-  ...args: TArgs
-): unknown {
-  let routine = new Routine("evaluate", op(...args));
-  return reduce([routine], Ok());
-}
+export class Reducer {
+  reducing = false;
+  queue: Routine[] = [];
 
-function reduce(stack: (Routine | Reset)[], value: Result<unknown>): unknown {
-  let reducing = true;
+  enter<T>(routine: Routine<T>, value: Next = Ok()): void {
+    routine.value = value;
+    if (!routine.enqueued) {
+      routine.enqueued = true;
+      this.queue.push(routine as Routine<unknown>);
+    }
+    if (this.reducing) return;
 
-  try {
-    let register = value;
-    let reenter = (k: Continuation<unknown, unknown>, value: unknown) => {
-      let resume = new Routine(`reenter`, k(value));
-      stack.push(resume);
-      if (!reducing) {
-        reduce(stack, Ok(value));
-      }
-    };
+    this.reducing = true;
 
-    let current = stack.pop();
-    while (current) {
-      if (current instanceof Reset) {
-        current = stack.pop();
-        continue;
-      }
-      const next = iterate(current, register);
-      if (next.done) {
-        const result = next.value;
-        current.parent?.subroutines.delete(current);
-        register = result;
-        if (current.subroutines.size) {
-          stack.push(id(result), ...[...current.subroutines].map(exit));
-        }
-      } else {
-        stack.push(current);
-        const instruction = next.value;
-        if (instruction.type === "reset") {
-          let { block } = instruction;
-          stack.push(
-            new Reset(),
-            new Routine(instruction.block.name ?? "reset", block(), current),
-          );
-        } else if (instruction.type === "shift") {
-          let { block } = instruction;
-          let frames: Routine[] = [];
-          let top = stack.pop();
-          while (top && !(top instanceof Reset)) {
-            frames.unshift(top);
-            top = stack.pop();
+    try {
+      while (this.queue.length > 0) {
+        const current = this.queue.pop()!;
+        current.enqueued = false;
+        let { instructions } = current;
+        let next: IteratorResult<Instruction, Result<unknown>>;
+        try {
+          if (current.value === "halt") {
+            if (instructions.return) {
+              let result = instructions.return();
+              next = result.done
+                ? { done: true, value: Ok() }
+                : { done: false, value: result.value };
+            } else {
+              next = { done: true, value: Ok() };
+            }
+          } else if (current.value.ok) {
+            let result = instructions.next(current.value.value);
+            next = result.done
+              ? { done: true, value: Ok(result.value) }
+              : { done: false, value: result.value };
+          } else if (instructions.throw) {
+            let result = instructions.throw(current.value.error);
+            next = result.done
+              ? { done: true, value: Ok(result.value) }
+              : { done: false, value: result.value };
+          } else {
+            next = { done: true, value: current.value };
           }
-          let k: Continuation<unknown, unknown> = (value: unknown) => ({
-            *[Symbol.iterator]() {
-              register = Ok(value);
-              stack.push(new Reset(), ...frames);
-              return (yield { type: "suspend" }) as unknown;
-            },
-          });
-          stack.push(
-            new Reset(),
-            new Routine(
-              instruction.block.name ?? "shift",
-              block(k, reenter),
-              current,
-            ),
-          );
-        } else if (instruction.type === "suspend") {
-          stack.pop();
+        } catch (error) {
+          next = { done: true, value: Err(error) };
+        }
+
+        if (next.done) {
+          current.state = {
+            status: "settled",
+            teardown: Ok(),
+            result: Just(next.value),
+          };
+          for (let continuation of current.continuations) {
+            continuation(current.state);
+          }
+        } else {
+          let instruction = next.value;
+          if (instruction.type === "suspend") {
+            let { resolve, reject } = routine.suspend();
+
+            if (instruction.resume) {
+              routine.unsuspend = (instruction.resume(resolve, reject)) ??
+                (() => {});
+            }
+          }
         }
       }
-      current = stack.pop();
+    } finally {
+      this.reducing = false;
     }
-    return unbox(register);
-  } finally {
-    reducing = false;
+  }
+
+  createRoutine<T>(name: string, operation: Operation<T>) {
+    return new Routine<T>(name, this, operation);
   }
 }
 
-function iterate(
-  routine: Routine,
-  current: Result<unknown>,
-): IteratorResult<Instruction, Result<unknown>> {
-  let { instructions } = routine;
-  try {
-    if (current.ok) {
-      let next = instructions.next(current.value);
-      return next.done
-        ? { done: true, value: Ok(next.value) }
-        : { done: false, value: next.value };
-    } else if (instructions.throw) {
-      let next = instructions.throw(current.error);
-      return next.done
-        ? { done: true, value: Ok(next.value) }
-        : { done: false, value: next.value };
-    } else {
-      return { done: true, value: current };
-    }
-  } catch (error) {
-    return { done: true, value: Err(error) };
-  }
-}
-
-class Reset {}
-
-class Routine {
+export class Routine<T = unknown> {
+  public state: State<T> = { status: "pending" };
   public readonly instructions: Iterator<Instruction, unknown, unknown>;
-  public subroutines = new Set<Routine>();
+  public readonly continuations = new Set<Resolve<Settled<T>>>();
+  public enqueued = false;
+  public value: Next = Ok();
+  public unsuspend: () => void = () => {};
+
+  settled(): Operation<Settled<T>> {
+    if (this.state.status === "settled") {
+      return constant(this.state);
+    } else {
+      return suspend<Settled<T>>((resolve) => {
+        let { continuations } = this;
+
+        continuations.add(resolve);
+        return () => {
+          continuations.delete(resolve);
+        };
+      });
+    }
+  }
+
+  *await(): Operation<T> {
+    let settled = yield* this.settled();
+    if (settled.result.type === "none") {
+      let error = new Error("halted");
+      error.name = "HaltError";
+      throw error;
+    } else if (!settled.result.value.ok) {
+      throw settled.result.value.error;
+    } else {
+      let { value } = settled.result.value;
+      return value;
+    }
+  }
+
+  halt(): Operation<void> {
+    return {
+      [Symbol.iterator]: function* halt(this: Routine) {
+        if (this.state.status === "pending") {
+          this.state = { status: "settling", result: None<Result<T>>() };
+          this.resume("halt");
+        }
+        let outcome = yield* this.settled();
+        if (!outcome.teardown.ok) {
+          throw outcome.teardown.error;
+        }
+      }.bind(this as Routine),
+    };
+  }
+
   constructor(
     public readonly name: string,
+    public readonly reducer: Reducer,
     instructions: Iterable<Instruction>,
-    public readonly parent?: Routine,
   ) {
     this.instructions = instructions[Symbol.iterator]();
-    this.parent?.subroutines.add(this);
+  }
+
+  suspend() {
+    let $resume = (value: Next) => {
+      $resume = () => {};
+      this.resume(value);
+    };
+    return {
+      resolve: (value: unknown) => $resume(Ok(value)),
+      reject: (err: Error) => $resume(Err(err)),
+    };
+  }
+
+  resume(value: Next) {
+    let result = box(() => this.unsuspend());
+    this.reducer.enter(this, result.ok ? value : result);
   }
 }
 
-function id(value: Result<unknown>): Routine {
-  return new Routine(`id ${JSON.stringify(value)}`, {
-    *[Symbol.iterator]() {
-      return unbox(value);
-    },
-  });
-}
+type State<T> = Pending | Settling<T> | Settled<T>;
 
-function exit(routine: Routine): Routine {
-  let { instructions } = routine;
-  let output = Ok();
+type Pending = {
+  readonly status: "pending";
+};
 
-  let iterator: typeof routine.instructions = {
-    next() {
-      iterator.next = (value) => {
-        let result = instructions.next(value);
-        return result.done ? { done: true, value: unbox(output) } : result;
-      };
-      if (instructions.return) {
-        let result = instructions.return();
-        return result.done ? { done: true, value: unbox(output) } : result;
-      } else {
-        return { done: true, value: unbox(output) };
-      }
-    },
-    throw(err: Error) {
-      output = Err(err);
-      return iterator.next();
-    },
+type Settling<T> = {
+  readonly status: "settling";
+  readonly result: Maybe<Result<T>>;
+};
+
+type Settled<T> = {
+  readonly status: "settled";
+  readonly teardown: Result<void>;
+  readonly result: Maybe<Result<T>>;
+};
+
+type Next<T = unknown> = Result<T> | "halt";
+
+function constant<T>(value: T): Operation<T> {
+  return {
+    [Symbol.iterator]: () => ({ next: () => ({ done: true, value }) }),
   };
-  let exit = new Routine(`exit (${routine.name})`, {
-    [Symbol.iterator]: () => iterator,
-  });
-
-  exit.subroutines = routine.subroutines;
-  return exit;
 }

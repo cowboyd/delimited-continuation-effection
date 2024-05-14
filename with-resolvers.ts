@@ -1,6 +1,6 @@
-import { reset, shift } from "./continuation.ts";
 import { Err, Ok, Result, unbox } from "./result.ts";
-import type { Continuation, Operation } from "./types.ts";
+import { suspend } from "./suspend.ts";
+import type { Operation, Reject, Resolve } from "./types.ts";
 
 export interface WithResolvers<T> {
   operation: Operation<T>;
@@ -8,37 +8,45 @@ export interface WithResolvers<T> {
   reject(error: Error): void;
 }
 
-export function* withResolvers<T>(): Operation<WithResolvers<T>> {
-  return yield* reset(function* () {
-    let waiters = new Set<Continuation<void, void>>();
-    let result: Result<T>;
-    result = yield* shift<Result<T>, void, WithResolvers<T>>(
-      function* (k, reenter) {
-        let operation: Operation<T> = {
-          *[Symbol.iterator]() {
-            if (!result) {
-              yield* shift<void, void, void>(function* (k) {
-                try {
-                  waiters.add(k);
-                  yield* shift(function* () {});
-                } finally {
-                  waiters.delete(k);
-                }
-              });
-            }
-            return unbox(result);
-          },
-        };
+export function withResolvers<T>(): WithResolvers<T> {
+  let waiters = new Set<Resolve<void>>();
+  let $result: Result<T> | undefined = undefined;
 
-        return {
-          operation,
-          resolve: (value) => reenter(k, Ok(value)),
-          reject: (error) => reenter(k, Err(error)),
-        };
-      },
-    );
+  let notify = () => {
     for (let awaken of waiters) {
-      yield* awaken();
+      awaken();
     }
-  });
+  };
+
+  let resolve: Resolve<T> = (value) => {
+    if (!$result) {
+      $result = Ok(value);
+      notify();
+    }
+  };
+
+  let reject: Reject = (error) => {
+    if (!$result) {
+      $result = Err(error);
+      notify();
+    }
+  };
+
+  let operation: Operation<T> = {
+    *[Symbol.iterator]() {
+      if (!$result) {
+        yield* suspend((resolve) => {
+          waiters.add(resolve);
+          return () => waiters.delete(resolve);
+        });
+      }
+      return unbox($result!);
+    },
+  };
+
+  return {
+    operation,
+    resolve,
+    reject,
+  };
 }

@@ -1,7 +1,14 @@
 import { describe, it } from "jsr:@std/testing@0.221.0/bdd";
 import { expect } from "jsr:@std/expect";
 
-import { shift, reset, evaluate, type Operation, Continuation, ReEnter } from "../bare.ts";
+import {
+  Continuation,
+  evaluate,
+  type Operation,
+  ReEnter,
+  reset,
+  shift,
+} from "../bare.ts";
 
 describe("continuation", () => {
   it("evaluates synchronous values synchronously", () => {
@@ -59,7 +66,7 @@ describe("continuation", () => {
         });
       });
       return yield k(5);
-    })
+    });
     expect(num).toEqual(10);
   });
 
@@ -188,7 +195,7 @@ describe("continuation", () => {
       result = yield shift(function* (k, reenter) {
         return { reenter, k };
       });
-    }) as { k: Continuation<string>; reenter: ReEnter<string>; };
+    }) as { k: Continuation<string>; reenter: ReEnter<string> };
     reenter(k, "hello");
     expect(result).toEqual("hello");
   });

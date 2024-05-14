@@ -2,24 +2,18 @@ export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
 }
 
+export interface Task<T> extends Operation<T>, Promise<T> {
+  halt(): Operation<void>;
+}
+
 export type Instruction = {
-  type: "reset";
+  type: "spawn";
   block(): Operation<unknown>;
 } | {
-  type: "shift";
-  block(
-    k: Continuation<unknown, unknown>,
-    // deno-lint-ignore no-explicit-any
-    reenter: ReEnter<any>,
-  ): Operation<unknown>;
-} | {
   type: "suspend";
+  resume?: (resolve: Resolve<unknown>, reject: Reject) => void | (() => void);
 };
 
-export interface ReEnter<T> {
-  (k: Continuation<T, unknown>, value: T): void;
-}
+export type Resolve<T> = (value: T) => void;
+export type Reject = (error: Error) => void;
 
-export interface Continuation<T, R> {
-  (value: T): Operation<R>;
-}
