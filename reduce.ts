@@ -51,16 +51,59 @@ export class Reducer {
           next = { done: true, value: Err(error) };
         }
         if (next.done) {
-          let result = current.state.status === "settling"
-            ? current.state.result
-            : Just(next.value);
-          current.state = {
-            status: "settled",
-            teardown: Ok(),
-            result,
-          };
-          for (let continuation of current.continuations) {
-            continuation(current.state);
+          if (current.children.size === 0) {
+            if (current.state.status === "settling") {
+              let result = current.state.result;
+              let teardown = next.value as Result<void>;
+              current.state = {
+                status: "settled",
+                teardown,
+                result,
+              };
+            } else {
+              current.state = {
+                status: "settled",
+                teardown: Ok(),
+                result: Just(next.value),
+              };
+            }
+
+            for (let continuation of current.continuations) {
+              continuation(current.state);
+            }
+
+            let settled = current.state as Settled<unknown>;
+
+            if (current.parent) {
+              current.parent.children.delete(current);
+              if (!settled.teardown.ok) {
+                current.parent.resume(settled.teardown);
+              } else if (
+                settled.result.type === "just" && !settled.result.value.ok
+              ) {
+                current.parent.resume(settled.result.value);
+              }
+            }
+          } else {
+            current.state = {
+              status: "settling",
+              result: Just(next.value),
+            };
+            current.instructions = (function* () {
+              let error: Error | void = void 0;
+              for (let child of [...current.children].reverse()) {
+                current.children.delete(child);
+                try {
+                  yield* child.halt();
+                } catch (err) {
+                  error = err;
+                }
+                if (error) {
+                  throw error;
+                }
+              }
+            })();
+            current.resume(Ok());
           }
         } else {
           let instruction = next.value;
@@ -75,7 +118,7 @@ export class Reducer {
             }
           } else {
             let { block } = instruction;
-            let task = this.run(block);
+            let task = this.run(block, current);
             current.resume(Ok(task));
           }
         }
@@ -85,17 +128,21 @@ export class Reducer {
     }
   }
 
-  createRoutine<T>(name: string, operation: Operation<T>) {
-    return new Routine<T>(name, this, operation);
+  createRoutine<T>(name: string, operation: Operation<T>, parent?: Routine) {
+    return new Routine<T>(name, this, operation, parent);
   }
 
-  run<T>(op: () => Operation<T>): Task<T> {
+  run<T>(op: () => Operation<T>, parent?: Routine): Task<T> {
     let routine = this.createRoutine(
       op.name,
       (function* () {
         return yield* op();
       })(),
+      parent,
     );
+    if (parent) {
+      parent.children.add(routine as Routine);
+    }
 
     let $promise: Promise<T> | void = void (0);
     let promise = () => {
@@ -141,8 +188,9 @@ export class Reducer {
 
 export class Routine<T = unknown> {
   public state: State<T> = { status: "pending" };
-  public readonly instructions: Iterator<Instruction, unknown, unknown>;
   public readonly continuations = new Set<Resolve<Settled<T>>>();
+  public readonly children = new Set<Routine<unknown>>();
+  public instructions: Iterator<Instruction, unknown, unknown>;
   public enqueued = false;
   public value: Next = Ok();
   public unsuspend: () => void = () => {};
@@ -194,6 +242,7 @@ export class Routine<T = unknown> {
     public readonly name: string,
     public readonly reducer: Reducer,
     instructions: Iterable<Instruction>,
+    public readonly parent?: Routine,
   ) {
     this.instructions = instructions[Symbol.iterator]();
   }
@@ -233,4 +282,3 @@ type Settled<T> = {
 };
 
 type Next<T = unknown> = Result<T> | "halt";
-
