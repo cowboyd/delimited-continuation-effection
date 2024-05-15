@@ -5,6 +5,7 @@ import { Instruction, Operation, Resolve, Task } from "./types.ts";
 export * from "./types.ts";
 export * from "./sleep.ts";
 export * from "./suspend.ts";
+export * from "./spawn.ts";
 export * from "./run.ts";
 
 export class Reducer {
@@ -53,7 +54,7 @@ export class Reducer {
         } catch (error) {
           next = { done: true, value: Err(error) };
         }
-
+	//	console.log(current.name, next);
         if (next.done) {
           let result = current.state.status === "settling"
             ? current.state.result
@@ -69,16 +70,19 @@ export class Reducer {
         } else {
           let instruction = next.value;
           if (instruction.type === "suspend") {
-            let { resolve, reject } = routine.suspend();
+            let { resolve, reject } = current.reentrance();
 
             if (instruction.resume) {
-              routine.unsuspend = (instruction.resume(resolve, reject)) ??
+              current.unsuspend = (instruction.resume(resolve, reject)) ??
                 (() => {});
             } else if (current.state.status === "settling") {
-              //do not allow `yield* suspend()` inside a finally {}
               current.resume(Ok());
             }
-          }
+          } else {
+	    let { block } = instruction;
+	    let task = this.run(block); //TODO: add name
+	    current.resume(Ok(task));
+	  }
         }
       }
     } finally {
@@ -92,7 +96,7 @@ export class Reducer {
 
   run<T>(op: () => Operation<T>): Task<T> {
     let routine = this.createRoutine(
-      `run(${op.name})`,
+      op.name,
       (function* () {
         return yield* op();
       })(),
@@ -198,11 +202,11 @@ export class Routine<T = unknown> {
     instructions: Iterable<Instruction>,
   ) {
     this.instructions = instructions[Symbol.iterator]();
-    let { resolve } = this.suspend();
+    let { resolve } = this.reentrance();
     this.start = () => resolve(Ok());
   }
 
-  suspend() {
+  reentrance() {
     let $resume = (value: Next) => {
       $resume = () => {};
       this.resume(value);
