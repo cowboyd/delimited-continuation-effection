@@ -9,26 +9,26 @@ export interface WithResolvers<T> {
 }
 
 export function withResolvers<T>(): WithResolvers<T> {
-  let waiters = new Set<Resolve<void>>();
+  let continuations = new Set<Resolve<void>>();
   let $result: Result<T> | undefined = undefined;
 
-  let notify = () => {
-    for (let awaken of waiters) {
-      awaken();
+  let resumeAll = () => {
+    for (let continuation of continuations) {
+      continuation();
     }
   };
 
   let resolve: Resolve<T> = (value) => {
     if (!$result) {
       $result = Ok(value);
-      notify();
+      resumeAll();
     }
   };
 
   let reject: Reject = (error) => {
     if (!$result) {
       $result = Err(error);
-      notify();
+      resumeAll();
     }
   };
 
@@ -36,8 +36,8 @@ export function withResolvers<T>(): WithResolvers<T> {
     *[Symbol.iterator]() {
       if (!$result) {
         yield* suspend((resolve) => {
-          waiters.add(resolve);
-          return () => waiters.delete(resolve);
+          continuations.add(resolve);
+          return () => continuations.delete(resolve);
         });
       }
       return unbox($result!);

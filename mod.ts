@@ -92,6 +92,7 @@ export class Routine<T = unknown> {
   public enqueued = false;
   public value: Next = Ok();
   public unsuspend: () => void = () => {};
+  public readonly start: () => void;
 
   settled(): Operation<Settled<T>> {
     if (this.state.status === "settled") {
@@ -143,6 +144,8 @@ export class Routine<T = unknown> {
     instructions: Iterable<Instruction>,
   ) {
     this.instructions = instructions[Symbol.iterator]();
+    let { resolve } = this.suspend();
+    this.start = () => resolve(Ok());
   }
 
   suspend() {

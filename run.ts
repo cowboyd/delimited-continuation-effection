@@ -18,7 +18,7 @@ export function run<T>(op: () => Operation<T>): Task<T> {
     }
   })());
 
-  reducer.enter(routine);
+  routine.start();
 
   return {
     [Symbol.toStringTag]: "Task",
