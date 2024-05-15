@@ -92,7 +92,6 @@ export class Reducer {
             current.instructions = (function* () {
               let error: Error | void = void 0;
               for (let child of [...current.children].reverse()) {
-                current.children.delete(child);
                 try {
                   yield* child.halt();
                 } catch (err) {
