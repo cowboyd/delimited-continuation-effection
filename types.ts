@@ -2,10 +2,8 @@ export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
 }
 
-export interface Future<T> extends Operation<T>, Promise<T> {}
-
-export interface Task<T> extends Future<T> {
-  halt(): Operation<void>;
+export interface Task<T> extends Operation<T>, Promise<T> {
+  halt(): Task<void>;
 }
 
 export type Instruction = {

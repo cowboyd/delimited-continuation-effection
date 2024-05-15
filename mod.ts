@@ -1,7 +1,7 @@
 import { Just, Maybe, None } from "./maybe.ts";
 import { box, Err, Ok, type Result } from "./result.ts";
 import { suspend } from "./suspend.ts";
-import { Instruction, Operation, Resolve } from "./types.ts";
+import { Instruction, Operation, Resolve, Task } from "./types.ts";
 export * from "./types.ts";
 export * from "./sleep.ts";
 export * from "./suspend.ts";
@@ -82,6 +82,37 @@ export class Reducer {
 
   createRoutine<T>(name: string, operation: Operation<T>) {
     return new Routine<T>(name, this, operation);
+  }
+
+  run<T>(op: () => Operation<T>): Task<T> {
+    let { promise, resolve, reject } = Promise.withResolvers<T>();
+
+    let routine = this.createRoutine(
+      `run(${op.name})`,
+      (function* () {
+        try {
+          let value = yield* op();
+          resolve(value);
+          return value;
+        } catch (error) {
+          reject(error);
+          throw error;
+        } finally {
+          reject(new Error("halted"));
+        }
+      })(),
+    );
+
+    routine.start();
+
+    return {
+      [Symbol.toStringTag]: "Task",
+      [Symbol.iterator]: () => routine.await()[Symbol.iterator](),
+      then: (...args) => promise.then(...args),
+      catch: (...args) => promise.catch(...args),
+      finally: (...args) => promise.finally(...args),
+      halt: () => this.run(function halt() { return routine.halt() }),
+    };
   }
 }
 

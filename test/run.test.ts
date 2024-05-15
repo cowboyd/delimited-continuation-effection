@@ -1,5 +1,5 @@
 import { blowUp, createNumber, describe, expect, it } from "./suite.ts";
-import { run, suspend } from "../mod.ts";
+import { run, sleep, suspend } from "../mod.ts";
 
 //1. ensure that halted tasks are unsuspended first
 //2. ensure anything that is in the queue to have something run is also halted
@@ -92,12 +92,12 @@ describe("run()", () => {
       }
     });
 
-    await run(task.halt);
+    await task.halt();
     await expect(task).rejects.toHaveProperty("message", "halted");
     expect(halted).toEqual(true);
   });
 
-  it.skip("halts task when halted generator", async () => {
+  it("halts task when halted generator", async () => {
     let parent = "running";
     let child = "running";
     let task = run(function* () {
@@ -121,22 +121,22 @@ describe("run()", () => {
     expect(parent).toEqual("halted");
   });
 
-  // it("can perform async operations in a finally block", async () => {
-  //   let completed = false;
+  it.skip("can perform async operations in a finally block", async () => {
+    let completed = false;
 
-  //   let task = run(function* () {
-  //     try {
-  //       yield* suspend();
-  //     } finally {
-  //       yield* sleep(10);
-  //       completed = true;
-  //     }
-  //   });
+    let task = run(function* () {
+      try {
+        yield* suspend();
+      } finally {
+        yield* sleep(10);
+        completed = true;
+      }
+    });
 
-  //   await task.halt();
+    await task.halt();
 
-  //   expect(completed).toEqual(true);
-  // });
+    expect(completed).toEqual(true);
+  });
 
   // it("cannot explicitly suspend in a finally block", async () => {
   //   let done = false;
