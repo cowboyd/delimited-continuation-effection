@@ -55,10 +55,13 @@ export class Reducer {
         }
 
         if (next.done) {
+          let result = current.state.status === "settling"
+            ? current.state.result
+            : Just(next.value);
           current.state = {
             status: "settled",
             teardown: Ok(),
-            result: Just(next.value),
+            result,
           };
           for (let continuation of current.continuations) {
             continuation(current.state);
@@ -71,6 +74,9 @@ export class Reducer {
             if (instruction.resume) {
               routine.unsuspend = (instruction.resume(resolve, reject)) ??
                 (() => {});
+            } else if (current.state.status === "settling") {
+              //do not allow `yield* suspend()` inside a finally {}
+              current.resume(Ok());
             }
           }
         }
@@ -85,33 +91,51 @@ export class Reducer {
   }
 
   run<T>(op: () => Operation<T>): Task<T> {
-    let { promise, resolve, reject } = Promise.withResolvers<T>();
-
     let routine = this.createRoutine(
       `run(${op.name})`,
       (function* () {
-        try {
-          let value = yield* op();
-          resolve(value);
-          return value;
-        } catch (error) {
-          reject(error);
-          throw error;
-        } finally {
-          reject(new Error("halted"));
-        }
+        return yield* op();
       })(),
     );
+
+    let $promise: Promise<T> | void = void (0);
+    let promise = () => {
+      if ($promise) {
+        return $promise;
+      } else {
+        let { promise, resolve, reject } = Promise.withResolvers<T>();
+        let settle = (state: Settled<T>) => {
+          if (!state.teardown.ok) {
+            reject(state.teardown.error);
+          } else if (state.result.type === "none") {
+            reject(new Error("halted"));
+          } else if (state.result.type === "just") {
+            let { value } = state.result;
+            if (value.ok) {
+              resolve(value.value);
+            } else {
+              reject(value.error);
+            }
+          }
+        };
+        if (routine.state.status === "settled") {
+          settle(routine.state);
+        } else {
+          routine.continuations.add(settle);
+        }
+        return $promise = promise;
+      }
+    };
 
     routine.start();
 
     return {
       [Symbol.toStringTag]: "Task",
       [Symbol.iterator]: () => routine.await()[Symbol.iterator](),
-      then: (...args) => promise.then(...args),
-      catch: (...args) => promise.catch(...args),
-      finally: (...args) => promise.finally(...args),
-      halt: () => this.run(function halt() { return routine.halt() }),
+      then: (...args) => promise().then(...args),
+      catch: (...args) => promise().catch(...args),
+      finally: (...args) => promise().finally(...args),
+      halt: () => routine.halt(),
     };
   }
 }
@@ -131,7 +155,6 @@ export class Routine<T = unknown> {
     } else {
       return suspend<Settled<T>>((resolve) => {
         let { continuations } = this;
-
         continuations.add(resolve);
         return () => {
           continuations.delete(resolve);

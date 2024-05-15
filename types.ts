@@ -3,7 +3,7 @@ export interface Operation<T> {
 }
 
 export interface Task<T> extends Operation<T>, Promise<T> {
-  halt(): Task<void>;
+  halt(): Operation<void>;
 }
 
 export type Instruction = {

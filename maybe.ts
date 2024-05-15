@@ -3,7 +3,7 @@ export type Maybe<T> = {
   value: T;
 } | {
   type: "none";
-}
+};
 
 export function Just<T>(value: T): Maybe<T> {
   return { type: "just", value };

@@ -1,5 +1,5 @@
 import { blowUp, createNumber, describe, expect, it } from "./suite.ts";
-import { run, sleep, suspend } from "../mod.ts";
+import { run, sleep, suspend, Task } from "../mod.ts";
 
 //1. ensure that halted tasks are unsuspended first
 //2. ensure anything that is in the queue to have something run is also halted
@@ -92,7 +92,7 @@ describe("run()", () => {
       }
     });
 
-    await task.halt();
+    await run(task.halt);
     await expect(task).rejects.toHaveProperty("message", "halted");
     expect(halted).toEqual(true);
   });
@@ -114,14 +114,14 @@ describe("run()", () => {
       }
     });
 
-    await task.halt();
+    await run(task.halt);
 
     await expect(task).rejects.toHaveProperty("message", "halted");
     expect(child).toEqual("halted");
     expect(parent).toEqual("halted");
   });
 
-  it.skip("can perform async operations in a finally block", async () => {
+  it("can perform async operations in a finally block", async () => {
     let completed = false;
 
     let task = run(function* () {
@@ -133,50 +133,49 @@ describe("run()", () => {
       }
     });
 
-    await task.halt();
+    await run(task.halt);
 
     expect(completed).toEqual(true);
   });
 
-  // it("cannot explicitly suspend in a finally block", async () => {
-  //   let done = false;
-  //   let task = run(function* () {
-  //     try {
-  //       yield* suspend();
-  //     } finally {
-  //       yield* suspend();
-  //       done = true;
-  //     }
-  //   });
+  it("cannot explicitly suspend in a finally block", async () => {
+    let done = false;
+    let task = run(function* () {
+      try {
+        yield* suspend();
+      } finally {
+        yield* suspend();
+        done = true;
+      }
+    });
 
-  //   await task.halt();
-  //   expect(done).toEqual(true);
-  // });
+    await run(task.halt);
+    expect(done).toEqual(true);
+  });
 
-  // it("can suspend in yielded finally block", async () => {
-  //   let things: string[] = [];
+  it("can suspend in yielded finally block", async () => {
+    let things: string[] = [];
 
-  //   let task = run(function* () {
-  //     try {
-  //       yield* (function* () {
-  //         try {
-  //           yield* suspend();
-  //         } finally {
-  //           yield* sleep(5);
-  //           things.push("first");
-  //         }
-  //       })();
-  //     } finally {
-  //       things.push("second");
-  //     }
-  //   });
+    let task = run(function* () {
+      try {
+        yield* (function* () {
+          try {
+            yield* suspend();
+          } finally {
+            yield* sleep(5);
+            things.push("first");
+          }
+        })();
+      } finally {
+        things.push("second");
+      }
+    });
 
-  //   await task.halt();
+    await run(task.halt);
+    await expect(task).rejects.toHaveProperty("message", "halted");
 
-  //   await expect(task).rejects.toHaveProperty("message", "halted");
-
-  //   expect(things).toEqual(["first", "second"]);
-  // });
+    expect(things).toEqual(["first", "second"]);
+  });
 
   // it("can be halted while in the generator", async () => {
   //   let task = run(function* Main() {
@@ -191,14 +190,14 @@ describe("run()", () => {
   //   await expect(task).rejects.toHaveProperty("message", "boom");
   // });
 
-  // it("can halt itself", async () => {
-  //   let task: Task<void> = run(function* () {
-  //     yield* sleep(3);
-  //     yield* task.halt();
-  //   });
+  it("can halt itself", async () => {
+    let task: Task<void> = run(function* () {
+      yield* sleep(3);
+      yield* task.halt();
+    });
 
-  //   await expect(task).rejects.toHaveProperty("message", "halted");
-  // });
+    await expect(task).rejects.toHaveProperty("message", "halted");
+  });
 
   // it("can halt itself between yield points", async () => {
   //   let task: Task<void> = run(function* () {
@@ -252,34 +251,34 @@ describe("run()", () => {
   //   await expect(task).rejects.toHaveProperty("message", "bang");
   // });
 
-  // it("propagates errors", async () => {
-  //   try {
-  //     await run(function* () {
-  //       throw new Error("boom");
-  //     });
-  //     throw new Error("expected error to propagate");
-  //   } catch (error) {
-  //     expect(error.message).toEqual("boom");
-  //   }
-  // });
+  it("propagates errors", async () => {
+    try {
+      await run(function* () {
+        throw new Error("boom");
+      });
+      throw new Error("expected error to propagate");
+    } catch (error) {
+      expect(error.message).toEqual("boom");
+    }
+  });
 
-  // it("propagates errors from promises", async () => {
-  //   try {
-  //     await run(function* () {
-  //       yield* Promise.reject(new Error("boom"));
-  //     });
-  //     throw new Error("expected error to propagate");
-  //   } catch (error) {
-  //     expect(error.message).toEqual("boom");
-  //   }
-  // });
+  it("propagates errors from promises", async () => {
+    try {
+      await run(function* () {
+        yield* Promise.reject(new Error("boom"));
+      });
+      throw new Error("expected error to propagate");
+    } catch (error) {
+      expect(error.message).toEqual("boom");
+    }
+  });
 
-  // it("successfully halts when task fails, but shutdown succeeds ", async () => {
-  //   let task = run(function* () {
-  //     throw new Error("boom!");
-  //   });
+  it("successfully halts when task fails, but shutdown succeeds ", async () => {
+    let task = run(function* () {
+      throw new Error("boom!");
+    });
 
-  //   await expect(task).rejects.toHaveProperty("message", "boom!");
-  //   await expect(task.halt()).resolves.toBe(undefined);
-  // });
+    await expect(task).rejects.toHaveProperty("message", "boom!");
+    await expect(run(task.halt)).resolves.toBe(undefined);
+  });
 });
