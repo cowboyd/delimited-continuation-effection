@@ -195,11 +195,11 @@ describe("run()", () => {
     await expect(task).rejects.toHaveProperty("message", "halted");
   });
 
-  it.skip("can halt itself between yield points", async () => {
-    let task: Task<void> = run(function* () {
+  it("can halt itself between yield points", async () => {
+    let task: Task<void> = run(function* root() {
       yield* sleep(1);
 
-      yield* spawn(function* () {
+      yield* spawn(function* child() {
         yield* task.halt();
       });
 

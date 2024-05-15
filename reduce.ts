@@ -87,7 +87,9 @@ export class Reducer {
           } else {
             current.state = {
               status: "settling",
-              result: Just(next.value),
+              result: current.state.status === "settling"
+                ? current.state.result
+                : Just(next.value),
             };
             current.instructions = (function* () {
               let error: Error | void = void 0;
@@ -212,7 +214,6 @@ export class Routine<T = unknown> {
     let settled = yield* this.settled();
     if (settled.result.type === "none") {
       let error = new Error("halted");
-      error.name = "HaltError";
       throw error;
     } else if (!settled.result.value.ok) {
       throw settled.result.value.error;
