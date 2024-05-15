@@ -1,10 +1,6 @@
 import { blowUp, createNumber, describe, expect, it } from "./suite.ts";
 import { run, sleep, spawn, suspend, Task } from "../mod.ts";
 
-//1. ensure that halted tasks are unsuspended first
-//2. ensure anything that is in the queue to have something run is also halted
-//3. halting is idempotent
-
 describe("run()", () => {
   it("can run an operation", async () => {
     await expect(run(function* () {
