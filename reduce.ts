@@ -1,3 +1,4 @@
+import { constant } from "./constant.ts";
 import { Just, Maybe, None } from "./maybe.ts";
 import { box, Err, Ok, Result } from "./result.ts";
 import { suspend } from "./suspend.ts";
@@ -49,7 +50,6 @@ export class Reducer {
         } catch (error) {
           next = { done: true, value: Err(error) };
         }
-        //	console.log(current.name, next);
         if (next.done) {
           let result = current.state.status === "settling"
             ? current.state.result
@@ -126,7 +126,7 @@ export class Reducer {
       }
     };
 
-    routine.start();
+    routine.resume(Ok());
 
     return {
       [Symbol.toStringTag]: "Task",
@@ -146,7 +146,6 @@ export class Routine<T = unknown> {
   public enqueued = false;
   public value: Next = Ok();
   public unsuspend: () => void = () => {};
-  public readonly start: () => void;
 
   settled(): Operation<Settled<T>> {
     if (this.state.status === "settled") {
@@ -197,8 +196,6 @@ export class Routine<T = unknown> {
     instructions: Iterable<Instruction>,
   ) {
     this.instructions = instructions[Symbol.iterator]();
-    let { resolve } = this.reentrance();
-    this.start = () => resolve(Ok());
   }
 
   reentrance() {
@@ -237,8 +234,3 @@ type Settled<T> = {
 
 type Next<T = unknown> = Result<T> | "halt";
 
-function constant<T>(value: T): Operation<T> {
-  return {
-    [Symbol.iterator]: () => ({ next: () => ({ done: true, value }) }),
-  };
-}
