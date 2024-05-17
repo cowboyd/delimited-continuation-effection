@@ -51,7 +51,7 @@ export class Reducer {
           next = { done: true, value: Err(error) };
         }
         if (next.done) {
-          if (current.children.size === 0) {
+	  if (current.delimiters.every(d => d.routines.size === 0 )) {
             if (current.state.status === "settling") {
               let result = current.state.result;
               let teardown = next.value as Result<void>;
@@ -75,7 +75,7 @@ export class Reducer {
             let settled = current.state as Settled<unknown>;
 
             if (current.parent) {
-              current.parent.children.delete(current);
+              current.parent.delimeter.routines.delete(current);
               if (!settled.teardown.ok) {
                 current.parent.resume(settled.teardown);
               } else if (
@@ -93,7 +93,7 @@ export class Reducer {
             };
             current.instructions = (function* () {
               let error: Error | void = void 0;
-              for (let child of [...current.children].reverse()) {
+              for (let child of [...current.delimeter.routines].reverse()) {
                 try {
                   yield* child.halt();
                 } catch (err) {
@@ -117,10 +117,14 @@ export class Reducer {
             } else if (current.state.status === "settling") {
               current.resume(Ok());
             }
-          } else {
+          } else if (instruction.type === "spawn") {
             let { block } = instruction;
             let task = this.run(block, current);
             current.resume(Ok(task));
+          } else if (instruction.type === "pushdelimiter") {
+            current.resume(current.value);
+          } else {
+            current.resume(current.value);
           }
         }
       }
@@ -141,9 +145,6 @@ export class Reducer {
       })(),
       parent,
     );
-    if (parent) {
-      parent.children.add(routine as Routine);
-    }
 
     let $promise: Promise<T> | void = void (0);
     let promise = () => {
@@ -187,14 +188,22 @@ export class Reducer {
   }
 }
 
+export interface Delimiter {
+  routines: Set<Routine>;
+}
+
 export class Routine<T = unknown> {
   public state: State<T> = { status: "pending" };
   public readonly continuations = new Set<Resolve<Settled<T>>>();
-  public readonly children = new Set<Routine<unknown>>();
   public instructions: Iterator<Instruction, unknown, unknown>;
+  public delimiters: Delimiter[] = [{ routines: new Set() }];
   public enqueued = false;
   public value: Next = Ok();
   public unsuspend: () => void = () => {};
+
+  get delimeter(): Delimiter {
+    return this.delimiters[this.delimiters.length - 1];
+  }
 
   settled(): Operation<Settled<T>> {
     if (this.state.status === "settled") {
@@ -223,19 +232,26 @@ export class Routine<T = unknown> {
     }
   }
 
-  halt(): Operation<void> {
+  exit(outcome: Maybe<Result<T>>): Operation<Settled<T>> {
+    this.exit = this.settled;
     return {
-      [Symbol.iterator]: function* halt(this: Routine) {
-        if (this.state.status === "pending") {
-          this.state = { status: "settling", result: None<Result<T>>() };
-          this.resume("halt");
-        }
-        let outcome = yield* this.settled();
-        if (!outcome.teardown.ok) {
-          throw outcome.teardown.error;
-        }
-      }.bind(this as Routine),
+      [Symbol.iterator]: function* exit(this: Routine<T>) {
+	this.state = { status: "settling", result: outcome };
+	if (outcome.type === "none") {
+	  this.resume("halt");
+	} else {
+	  this.resume(outcome.value);
+	}
+	return yield* this.settled();
+      }.bind(this)
     };
+  }
+
+  *halt(): Operation<void> {
+    let settled = yield* this.exit(None());
+    if (!settled.teardown.ok) {
+      throw settled.teardown.error;
+    }
   }
 
   constructor(
@@ -245,6 +261,9 @@ export class Routine<T = unknown> {
     public readonly parent?: Routine,
   ) {
     this.instructions = instructions[Symbol.iterator]();
+    if (parent) {
+      parent.delimeter.routines.add(this as Routine);
+    }
   }
 
   reentrance() {
