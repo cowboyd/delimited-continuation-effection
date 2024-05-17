@@ -77,13 +77,11 @@ export class Reducer {
             if (current.parent) {
               current.litter?.delete(current);
               if (!settled.teardown.ok) {
-                //TODO: Crash Parent
-                current.parent.resume(settled.teardown);
+		current.parent.exit(Just(settled.teardown));
               } else if (
                 settled.result.type === "just" && !settled.result.value.ok
               ) {
-                //TODO: Crash Parent
-                current.parent.resume(settled.result.value);
+		current.parent.exit(Just(settled.result.value));
               }
             }
           } else {
@@ -262,17 +260,9 @@ export class Routine<T = unknown> {
 
   exit(outcome: Maybe<Result<T>>): Operation<Settled<T>> {
     this.exit = this.settled;
-    return {
-      [Symbol.iterator]: function* exit(this: Routine<T>) {
-        this.state = { status: "settling", result: outcome };
-        if (outcome.type === "none") {
-          this.resume("halt");
-        } else {
-          this.resume(outcome.value);
-        }
-        return yield* this.settled();
-      }.bind(this),
-    };
+    this.state = { status: "settling", result: outcome };
+    this.resume("halt");
+    return this.settled();
   }
 
   *halt(): Operation<void> {
