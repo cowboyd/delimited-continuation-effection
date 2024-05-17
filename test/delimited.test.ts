@@ -1,5 +1,5 @@
 import { describe, expect, it } from "./suite.ts";
-import { run, spawn, suspend } from "../mod.ts";
+import { run, sleep, spawn, suspend } from "../mod.ts";
 import { delimited } from "../delimited.ts";
 
 describe("delimiter", () => {
@@ -25,8 +25,8 @@ describe("delimiter", () => {
             exits.inner = true;
           }
         });
+        yield* sleep(0);
       });
-
       expect(exits.inner).toEqual(true);
     });
     expect(exits.outer).toEqual(true);

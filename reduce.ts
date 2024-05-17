@@ -51,7 +51,7 @@ export class Reducer {
           next = { done: true, value: Err(error) };
         }
         if (next.done) {
-	  if (current.delimiters.every(d => d.routines.size === 0 )) {
+          if (current.delimiters.every((d) => d.routines.size === 0)) {
             if (current.state.status === "settling") {
               let result = current.state.result;
               let teardown = next.value as Result<void>;
@@ -75,12 +75,14 @@ export class Reducer {
             let settled = current.state as Settled<unknown>;
 
             if (current.parent) {
-              current.parent.delimeter.routines.delete(current);
+              current.litter?.delete(current);
               if (!settled.teardown.ok) {
+                //TODO: Crash Parent
                 current.parent.resume(settled.teardown);
               } else if (
                 settled.result.type === "just" && !settled.result.value.ok
               ) {
+                //TODO: Crash Parent
                 current.parent.resume(settled.result.value);
               }
             }
@@ -91,11 +93,17 @@ export class Reducer {
                 ? current.state.result
                 : Just(next.value),
             };
+
             current.instructions = (function* () {
+              let { delimiters } = current;
               let error: Error | void = void 0;
-              for (let child of [...current.delimeter.routines].reverse()) {
+              for (
+                let delimiter = delimiters.pop();
+                delimiter;
+                delimiter = delimiters.pop()
+              ) {
                 try {
-                  yield* child.halt();
+                  yield* delimiter.drop();
                 } catch (err) {
                   error = err;
                 }
@@ -122,7 +130,12 @@ export class Reducer {
             let task = this.run(block, current);
             current.resume(Ok(task));
           } else if (instruction.type === "pushdelimiter") {
-            current.resume(current.value);
+            let delimiter = new Delimiter();
+            current.delimiters.push(delimiter);
+            current.resume(Ok(delimiter));
+          } else if (instruction.type === "popdelimiter") {
+            current.delimiters.pop();
+            current.resume(Ok());
           } else {
             current.resume(current.value);
           }
@@ -188,15 +201,30 @@ export class Reducer {
   }
 }
 
-export interface Delimiter {
-  routines: Set<Routine>;
+class Delimiter {
+  routines = new Set<Routine>();
+
+  *drop(): Operation<void> {
+    let error: Error | void = void 0;
+    for (let routine of [...this.routines].reverse()) {
+      try {
+        yield* routine.halt();
+      } catch (err) {
+        error = err;
+      }
+      if (error) {
+        throw error;
+      }
+    }
+  }
 }
 
 export class Routine<T = unknown> {
   public state: State<T> = { status: "pending" };
+  public readonly litter?: Set<Routine>;
   public readonly continuations = new Set<Resolve<Settled<T>>>();
   public instructions: Iterator<Instruction, unknown, unknown>;
-  public delimiters: Delimiter[] = [{ routines: new Set() }];
+  public delimiters: Delimiter[] = [new Delimiter()];
   public enqueued = false;
   public value: Next = Ok();
   public unsuspend: () => void = () => {};
@@ -236,14 +264,14 @@ export class Routine<T = unknown> {
     this.exit = this.settled;
     return {
       [Symbol.iterator]: function* exit(this: Routine<T>) {
-	this.state = { status: "settling", result: outcome };
-	if (outcome.type === "none") {
-	  this.resume("halt");
-	} else {
-	  this.resume(outcome.value);
-	}
-	return yield* this.settled();
-      }.bind(this)
+        this.state = { status: "settling", result: outcome };
+        if (outcome.type === "none") {
+          this.resume("halt");
+        } else {
+          this.resume(outcome.value);
+        }
+        return yield* this.settled();
+      }.bind(this),
     };
   }
 
@@ -262,7 +290,8 @@ export class Routine<T = unknown> {
   ) {
     this.instructions = instructions[Symbol.iterator]();
     if (parent) {
-      parent.delimeter.routines.add(this as Routine);
+      this.litter = parent.delimeter.routines;
+      this.litter.add(this as Routine);
     }
   }
 

@@ -6,6 +6,10 @@ export interface Task<T> extends Operation<T>, Promise<T> {
   halt(): Operation<void>;
 }
 
+export interface Delimiter {
+  drop(): Operation<void>;
+}
+
 export type Instruction = {
   type: "spawn";
   block(): Operation<unknown>;
