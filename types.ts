@@ -12,6 +12,10 @@ export type Instruction = {
 } | {
   type: "suspend";
   resume?: (resolve: Resolve<unknown>, reject: Reject) => void | (() => void);
+} | {
+  type: "pushdelimiter";
+} | {
+  type: "popdelimiter";
 };
 
 export type Resolve<T> = (value: T) => void;
