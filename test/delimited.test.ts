@@ -1,6 +1,6 @@
 import { describe, expect, it } from "./suite.ts";
 import { run, sleep, spawn, suspend } from "../mod.ts";
-import { delimited } from "../delimited.ts";
+import { delimit } from "../delimited.ts";
 
 describe("delimiter", () => {
   it("marks the boundaries of spawned tasks", async () => {
@@ -17,7 +17,7 @@ describe("delimiter", () => {
         }
       });
 
-      yield* delimited(function* () {
+      yield* delimit(function* () {
         yield* spawn(function* () {
           try {
             yield* suspend();

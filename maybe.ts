@@ -1,16 +1,21 @@
+import { Err, Ok, Result } from "./result.ts";
+
 export type Maybe<T> = {
   type: "just";
-  value: T;
+  result: Result<T>;
 } | {
   type: "none";
+  result: Result<void>;
 };
 
-export function Just<T>(value: T): Maybe<T> {
-  return { type: "just", value };
+export function Just<T>(result: Result<T>): Maybe<T> {
+  return { type: "just", result };
 }
 
-const none = { type: "none" };
-
-export function None<T>(): Maybe<T> {
-  return none as Maybe<T>;
+export function None<T>(error?: Error): Maybe<T> {
+  if (error) {
+    return { type: "none", result: Err(error) };
+  } else {
+    return { type: "none", result: Ok() };
+  }
 }

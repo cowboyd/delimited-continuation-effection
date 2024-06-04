@@ -1,11 +1,22 @@
+import { useSelf } from "./coroutine.ts";
 import type { Delimiter, Operation } from "./types.ts";
 
-export function* delimited<T>(op: () => Operation<T>): Operation<T> {
-  let delimiter = (yield { type: "pushdelimiter" }) as Delimiter;
+export function* delimit<T>(
+  delimiter: Delimiter,
+  op: () => Operation<T>,
+): Operation<T> {
+  let self = yield* useSelf();
+  let { handlers: original } = self;
+  let delimited = Object.create(original, {
+    [delimiter.handler]: {
+      value: delimiter,
+    },
+  });
+
   try {
-    return yield* op();
+    self.handlers = delimited;
+    return yield* delimiter.delimit(op);
   } finally {
-    yield* delimiter.drop();
-    yield { type: "popdelimiter" };
+    self.handlers = original;
   }
 }

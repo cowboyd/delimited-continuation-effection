@@ -1,15 +1,12 @@
-import { Operation, Reject, Resolve } from "./types.ts";
+import { Suspend } from "./coroutine.ts";
+import type { Operation, Unsuspend } from "./types.ts";
 
 export function suspend(): Operation<void>;
-export function suspend<T = void>(resume: Resume<T>): Operation<T>;
-export function suspend(resume?: Resume<unknown>): Operation<unknown> {
+export function suspend<T = void>(resume: Unsuspend<T>): Operation<T>;
+export function suspend(unsuspend?: Unsuspend<unknown>): Operation<unknown> {
   return {
     *[Symbol.iterator]() {
-      return (yield { type: "suspend", resume });
+      return yield Suspend(unsuspend);
     },
   };
-}
-
-export interface Resume<T> {
-  (resolve: Resolve<T>, reject: Reject): () => void;
 }
