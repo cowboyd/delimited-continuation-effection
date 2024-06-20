@@ -55,12 +55,7 @@ export function run<T>(operation: () => Operation<T>): Task<T> {
     },
     catch: (...args) => promise.promise.catch(...args),
     finally: (...args) => promise.promise.finally(...args),
-    halt() {
-      if (!halt) {
-        halt = createHalt(routine, value.future);
-      }
-      return halt;
-    },
+    halt: () => halt ? halt : halt = createHalt(routine, value.future),
   } satisfies Task<T>;
 
   routine.next(Resume(Ok()));

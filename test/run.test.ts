@@ -151,29 +151,29 @@ describe("run()", () => {
   //   expect(done).toEqual(true);
   // });
 
-  // it("can suspend in yielded finally block", async () => {
-  //   let things: string[] = [];
+  it("can suspend in yielded finally block", async () => {
+    let things: string[] = [];
 
-  //   let task = run(function* () {
-  //     try {
-  //       yield* (function* () {
-  //         try {
-  //           yield* suspend();
-  //         } finally {
-  //           yield* sleep(5);
-  //           things.push("first");
-  //         }
-  //       })();
-  //     } finally {
-  //       things.push("second");
-  //     }
-  //   });
+    let task = run(function* () {
+      try {
+        yield* (function* () {
+          try {
+            yield* suspend();
+          } finally {
+            yield* sleep(5);
+            things.push("first");
+          }
+        })();
+      } finally {
+        things.push("second");
+      }
+    });
 
-  //   await run(task.halt);
-  //   await expect(task).rejects.toHaveProperty("message", "halted");
+    await task.halt();
+    await expect(task).rejects.toHaveProperty("message", "halted");
 
-  //   expect(things).toEqual(["first", "second"]);
-  // });
+    expect(things).toEqual(["first", "second"]);
+  });
 
   // it("can be halted while in the generator", async () => {
   //   let task = run(function* Main() {
