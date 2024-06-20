@@ -108,7 +108,7 @@ describe("run()", () => {
     await run(task.halt);
     await expect(task).rejects.toHaveProperty("message", "halted");
     expect(halted).toEqual(true);
-  })
+  });
 
   it("halts task when halted generator", async () => {
     let parent = "running";
