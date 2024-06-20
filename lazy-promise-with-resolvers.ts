@@ -1,7 +1,7 @@
 import { Err, Ok, type Result, unbox } from "./result.ts";
 
 export function lazyPromiseWithResolvers<T>(
-  toStringTag: string,
+  toStringTag: string = "LazyPromise",
 ): PromiseWithResolvers<T> {
   let _promise: Promise<Result<T>> | undefined = undefined;
   let _result: Result<T> | undefined = undefined;
@@ -18,15 +18,14 @@ export function lazyPromiseWithResolvers<T>(
   let reify = async () => {
     if (!_promise) {
       if (_result) {
-	_promise = Promise.resolve(_result);
+        _promise = Promise.resolve(_result);
       } else {
         _promise = new Promise<Result<T>>((resolve) => {
           settle = resolve;
         });
       }
     }
-    
-    
+
     let result = await _promise;
     return unbox(result);
   };

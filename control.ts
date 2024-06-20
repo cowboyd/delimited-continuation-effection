@@ -55,15 +55,17 @@ export interface ControlOptions<T> {
   done(value: Result<T>): void;
 }
 
-export function createControlDelimiter<T>(options: ControlOptions<T>): Delimiter<Control> {
+export function createControlDelimiter<T>(
+  options: ControlOptions<T>,
+): Delimiter<Control> {
   let iterator: Iterator<Instruction, T, unknown> | undefined = undefined;
   let instructions = () => {
     if (!iterator) {
       iterator = options.operation()[Symbol.iterator]();
     }
     return iterator;
-  }
-  
+  };
+
   let exit = Ok();
 
   return {
@@ -76,22 +78,22 @@ export function createControlDelimiter<T>(options: ControlOptions<T>): Delimiter
         } else if (control.method === "resume") {
           let result = control.result;
           if (result.ok) {
-            let next = instructions().next(result.value);
+            let next = iterator.next(result.value);
             if (next.done) {
               routine.next(Done(Ok(next.value)));
             } else {
               routine.next(next.value);
             }
           } else if (iterator.throw) {
-	    let next = iterator.throw(result.error);
-	    if (next.done) {
-	      routine.next(Done(Ok(next.value)));
-	    } else {
-	      routine.next(next.value);
-	    }
-	  } else {
-	    throw result.error;
-	  }
+            let next = iterator.throw(result.error);
+            if (next.done) {
+              routine.next(Done(Ok(next.value)));
+            } else {
+              routine.next(next.value);
+            }
+          } else {
+            throw result.error;
+          }
         } else if (control.method === "break") {
           if (!control.result.ok) {
             exit = control.result;
@@ -121,10 +123,10 @@ export function createControlDelimiter<T>(options: ControlOptions<T>): Delimiter
             teardown = control.unsuspend(resolve, reject) ?? (() => {});
           }
         } else if (control.method === "done") {
-	  options.done(control.result as Result<T>);
-	}
+          options.done(control.result as Result<T>);
+        }
       } catch (error) {
-        routine.next(Done(Err(error)));
+        options.done(Err(error));
       }
     },
     *delimit(op) {

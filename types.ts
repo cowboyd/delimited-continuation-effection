@@ -2,8 +2,10 @@ export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
 }
 
-export interface Task<T> extends Operation<T>, Promise<T> {
-  //  halt(): Operation<void>;
+export interface Future<T> extends Operation<T>, Promise<T> {}
+
+export interface Task<T> extends Future<T> {
+  halt(): Future<void>;
 }
 
 export interface Coroutine {
@@ -24,4 +26,3 @@ export interface Instruction<TData = unknown> {
 
 export type Resolve<T> = (value: T) => void;
 export type Reject = (error: Error) => void;
-

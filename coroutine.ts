@@ -1,10 +1,5 @@
-import { ControlOptions, Self, createControlDelimiter } from "./control.ts";
-import type {
-  Coroutine,
-  Delimiter,
-  Instruction,
-  Operation,
-} from "./types.ts";
+import { ControlOptions, createControlDelimiter, Self } from "./control.ts";
+import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
 
 export interface Reduce {
   (routine: Coroutine, instruction: Instruction): void;
@@ -36,8 +31,6 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine {
     handlers,
     next: (instruction) => reduce(routine, instruction),
   };
-  
+
   return routine;
 }
-
-
