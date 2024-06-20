@@ -2,11 +2,15 @@ import { Resume } from "./control.ts";
 import { Err } from "./result.ts";
 import { Coroutine, Instruction } from "./types.ts";
 
+export interface Reduce {
+  (routine: Coroutine, instruction: Instruction): void;
+}
+
 export class Reducer {
   reducing = false;
   readonly queue: [Coroutine, Instruction][] = [];
 
-  reduce = (routine: Coroutine, instruction: Instruction) => {
+  reduce: Reduce = (routine: Coroutine, instruction: Instruction) => {
     let { queue } = this;
     queue.unshift([routine, instruction]);
     if (this.reducing) return;
@@ -22,7 +26,7 @@ export class Reducer {
         if (!delimiter) {
           let error = new Error(handler);
           error.name = `UnknownHandler`;
-          routine.next(Resume(Err(error)));
+          this.reduce(routine, Resume(Err(error)));
         } else {
           delimiter.handle(data, routine);
         }

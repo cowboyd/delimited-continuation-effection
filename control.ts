@@ -1,3 +1,4 @@
+import { Reduce } from "./reduce.ts";
 import { Err, Ok, Result } from "./result.ts";
 import { Delimiter, Instruction, Operation, Reject, Resolve } from "./types.ts";
 
@@ -52,6 +53,7 @@ export type Control = {
 
 export interface ControlOptions<T> {
   operation(): Operation<T>;
+  reduce: Reduce;
   done(value: Result<T>): void;
 }
 
@@ -68,28 +70,30 @@ export function createControlDelimiter<T>(
 
   let exit = Ok();
 
+  let { reduce } = options;
+
   return {
     handler: "@effection/coroutine",
     handle(control, routine) {
       try {
         let iterator = instructions();
         if (control.method === "self") {
-          routine.next(Resume(Ok(routine)));
+          reduce(routine, Resume(Ok(routine)));
         } else if (control.method === "resume") {
           let result = control.result;
           if (result.ok) {
             let next = iterator.next(result.value);
             if (next.done) {
-              routine.next(Done(Ok(next.value)));
+              reduce(routine, Done(Ok(next.value)));
             } else {
-              routine.next(next.value);
+              reduce(routine, next.value);
             }
           } else if (iterator.throw) {
             let next = iterator.throw(result.error);
             if (next.done) {
-              routine.next(Done(Ok(next.value)));
+              reduce(routine, Done(Ok(next.value)));
             } else {
-              routine.next(next.value);
+              reduce(routine, next.value);
             }
           } else {
             throw result.error;
@@ -101,12 +105,12 @@ export function createControlDelimiter<T>(
           if (iterator.return) {
             let next = iterator.return();
             if (next.done) {
-              routine.next(Done(Ok()));
+              reduce(routine, Done(Ok()));
             } else {
-              routine.next(next.value);
+              reduce(routine, next.value);
             }
           } else {
-            routine.next(Done(Ok()));
+            reduce(routine, Done(Ok()));
           }
         } else if (control.method === "suspend") {
           let teardown: () => void;
@@ -115,7 +119,7 @@ export function createControlDelimiter<T>(
             let settle = (result: Result<unknown>) => {
               if (!settled) {
                 teardown();
-                routine.next(Resume(result));
+                reduce(routine, Resume(result));
               }
             };
             let resolve = (value: unknown) => settle(Ok(value));

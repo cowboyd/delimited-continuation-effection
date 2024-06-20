@@ -10,7 +10,7 @@ export interface Task<T> extends Future<T> {
 
 export interface Coroutine {
   handlers: Record<string, Delimiter>;
-  next(instruction: Instruction): void;
+  reduce(routine: Coroutine, instruction: Instruction): void;
 }
 
 export interface Delimiter<TData = unknown> {

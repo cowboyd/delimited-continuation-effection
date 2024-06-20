@@ -1,5 +1,5 @@
 import { blowUp, createNumber, describe, expect, it } from "./suite.ts";
-import { run, sleep, spawn, suspend, Task } from "../mod.ts";
+import { run, sleep, suspend, Task } from "../mod.ts";
 
 describe("run()", () => {
   it("can run an operation", async () => {
@@ -90,10 +90,25 @@ describe("run()", () => {
       }
     });
 
-    await run(task.halt);
+    await task.halt();
     await expect(task).rejects.toHaveProperty("message", "halted");
     expect(halted).toEqual(true);
   });
+
+  it("can halt a task as an operation", async () => {
+    let halted = false;
+    let task = run(function* () {
+      try {
+        yield* suspend();
+      } finally {
+        halted = true;
+      }
+    });
+
+    await run(task.halt);
+    await expect(task).rejects.toHaveProperty("message", "halted");
+    expect(halted).toEqual(true);
+  })
 
   it("halts task when halted generator", async () => {
     let parent = "running";
@@ -112,7 +127,7 @@ describe("run()", () => {
       }
     });
 
-    await run(task.halt);
+    await task.halt();
 
     await expect(task).rejects.toHaveProperty("message", "halted");
     expect(child).toEqual("halted");

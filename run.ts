@@ -2,20 +2,26 @@ import { createCoroutine } from "./coroutine.ts";
 import { Ok } from "./result.ts";
 import { Just, Maybe, None } from "./maybe.ts";
 import type { Coroutine, Future, Operation, Task } from "./types.ts";
-import { Reducer } from "./reduce.ts";
+import { Reduce, Reducer } from "./reduce.ts";
 import { Break, Resume } from "./control.ts";
 import { createFutureWithResolvers } from "./future.ts";
 import { lazyPromiseWithResolvers } from "./lazy-promise-with-resolvers.ts";
+import { delimit } from "./delimited.ts";
+//import { spawnScope } from "./spawn.ts";
 
 export function run<T>(operation: () => Operation<T>): Task<T> {
   let { reduce } = new Reducer();
+  return createTask(operation, reduce);
+}
 
+export function createTask<T>(operation: () => Operation<T>, reduce: Reduce): Task<T> {
   let halt: Future<void> | undefined = undefined;
 
   let value = createFutureWithResolvers<Maybe<T>>();
 
   let routine = createCoroutine<T>({
     operation,
+    //    operation: () => delimit(spawnScope(), operation),
     reduce,
     done(result) {
       let outcome = !result.ok || !halt ? Just(result) : None<T>();
@@ -55,10 +61,10 @@ export function run<T>(operation: () => Operation<T>): Task<T> {
     },
     catch: (...args) => promise.promise.catch(...args),
     finally: (...args) => promise.promise.finally(...args),
-    halt: () => halt ? halt : halt = createHalt(routine, value.future),
+    halt: () => halt ? halt : halt = createHalt(routine, value.future, reduce),
   } satisfies Task<T>;
 
-  routine.next(Resume(Ok()));
+  reduce(routine, Resume(Ok()));
 
   return Object.create(task);
 }
@@ -66,10 +72,11 @@ export function run<T>(operation: () => Operation<T>): Task<T> {
 function createHalt(
   routine: Coroutine,
   value: Future<Maybe<unknown>>,
+  reduce: Reduce,
 ): Future<void> {
   let interrupt = () => {
     interrupt = () => {};
-    routine.next(Break(Ok()));
+    reduce(routine, Break(Ok()));
   };
 
   return {
