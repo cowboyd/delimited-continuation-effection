@@ -6,8 +6,7 @@ export interface Task<T> extends Operation<T>, Promise<T> {
   //  halt(): Operation<void>;
 }
 
-export interface Coroutine<T = unknown> {
-  instructions: Iterator<Instruction, T, unknown>;
+export interface Coroutine {
   handlers: Record<string, Delimiter>;
   next(instruction: Instruction): void;
 }
@@ -26,6 +25,3 @@ export interface Instruction<TData = unknown> {
 export type Resolve<T> = (value: T) => void;
 export type Reject = (error: Error) => void;
 
-export interface Unsuspend<T> {
-  (resolve: Resolve<T>, reject: Reject): () => void;
-}

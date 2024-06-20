@@ -1,5 +1,5 @@
-import { Suspend } from "./coroutine.ts";
-import type { Operation, Unsuspend } from "./types.ts";
+import { Suspend, Unsuspend } from "./control.ts";
+import type { Operation } from "./types.ts";
 
 export function suspend(): Operation<void>;
 export function suspend<T = void>(resume: Unsuspend<T>): Operation<T>;

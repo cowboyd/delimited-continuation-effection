@@ -36,47 +36,48 @@ describe("run()", () => {
     await expect(task).rejects.toEqual(error);
   });
 
-  // it("rejects generator if generator creation fails", async () => {
-  //   let task = run(function () {
-  //     throw new Error("boom");
-  //   });
-  //   await expect(task).rejects.toHaveProperty("message", "boom");
-  // });
+  it("rejects generator if generator creation fails", async () => {
+    let task = run(function () {
+      throw new Error("boom");
+    });
 
-  // it("can recover from errors in promise", async () => {
-  //   let error = new Error("boom");
-  //   let task = run(function* () {
-  //     let one = yield* Promise.resolve(12);
-  //     let two;
-  //     try {
-  //       yield* Promise.reject(error);
-  //       two = 9;
-  //     } catch (_) {
-  //       // swallow error and yield in catch block
-  //       two = yield* Promise.resolve(8);
-  //     }
-  //     let three = yield* Promise.resolve(55);
-  //     return one + two + three;
-  //   });
-  //   await expect(task).resolves.toEqual(75);
-  // });
+    await expect(task).rejects.toMatchObject({ message: "boom" });
+  });
 
-  // it("can recover from errors in operation", async () => {
-  //   let task = run(function* () {
-  //     let one = yield* Promise.resolve(12);
-  //     let two;
-  //     try {
-  //       yield* blowUp();
-  //       two = 9;
-  //     } catch (_e) {
-  //       // swallow error and yield in catch block
-  //       two = yield* Promise.resolve(8);
-  //     }
-  //     let three = yield* Promise.resolve(55);
-  //     return one + two + three;
-  //   });
-  //   await expect(task).resolves.toEqual(75);
-  // });
+  it("can recover from errors in promise", async () => {
+    let error = new Error("boom");
+    let task = run(function* () {
+      let one = yield* Promise.resolve(12);
+      let two;
+      try {
+        yield* Promise.reject(error);
+        two = 9;
+      } catch (_) {
+        // swallow error and yield in catch block
+        two = yield* Promise.resolve(8);
+      }
+      let three = yield* Promise.resolve(55);
+      return one + two + three;
+    });
+    await expect(task).resolves.toEqual(75);
+  });
+
+  it("can recover from errors in operation", async () => {
+    let task = run(function* () {
+      let one = yield* Promise.resolve(12);
+      let two;
+      try {
+        yield* blowUp();
+        two = 9;
+      } catch (_e) {
+        // swallow error and yield in catch block
+        two = yield* Promise.resolve(8);
+      }
+      let three = yield* Promise.resolve(55);
+      return one + two + three;
+    });
+    await expect(task).resolves.toEqual(75);
+  });
 
   // it("can halt generator", async () => {
   //   let halted = false;

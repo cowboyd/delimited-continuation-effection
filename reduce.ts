@@ -1,4 +1,4 @@
-import { Resume } from "./coroutine.ts";
+import { Resume } from "./control.ts";
 import { Err } from "./result.ts";
 import { Coroutine, Instruction } from "./types.ts";
 

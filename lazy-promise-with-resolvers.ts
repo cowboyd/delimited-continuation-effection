@@ -18,18 +18,15 @@ export function lazyPromiseWithResolvers<T>(
   let reify = async () => {
     if (!_promise) {
       if (_result) {
-        if (_result.ok) {
-          _promise = Promise.resolve(_result);
-        } else {
-          _promise = Promise.reject(_result);
-        }
+	_promise = Promise.resolve(_result);
       } else {
         _promise = new Promise<Result<T>>((resolve) => {
           settle = resolve;
         });
       }
     }
-
+    
+    
     let result = await _promise;
     return unbox(result);
   };
