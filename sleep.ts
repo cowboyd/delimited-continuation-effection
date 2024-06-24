@@ -5,7 +5,7 @@ export function sleep(duration: number): Operation<void> {
   return suspend((resolve) => {
     let timeoutId = setTimeout(resolve, duration);
     return () => {
-      clearTimeout(timeoutId)
+      clearTimeout(timeoutId);
     };
   });
 }

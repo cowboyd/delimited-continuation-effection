@@ -1,5 +1,5 @@
 import { blowUp, createNumber, describe, expect, it } from "./suite.ts";
-import { run, sleep, suspend, Task } from "../mod.ts";
+import { run, sleep, suspend } from "../mod.ts";
 
 describe("run()", () => {
   it("can run an operation", async () => {

@@ -1,4 +1,3 @@
-import { useSelf } from "./coroutine.ts";
 import { Err, Ok, Result } from "./result.ts";
 import { Delimiter, Instruction, Reject, Resolve } from "./types.ts";
 
@@ -104,22 +103,21 @@ export function createControlDelimiter<T>(
             reduce(routine, Done(Ok()));
           }
         } else if (control.method === "suspend") {
-
           if (control.unsuspend) {
             let settled = false;
             let settle = (result: Result<unknown>) => {
               if (!settled) {
-		teardown();
+                teardown();
                 reduce(routine, Resume(result));
               }
             };
             let resolve = (value: unknown) => settle(Ok(value));
             let reject = (error: Error) => settle(Err(error));
             let unsuspend = control.unsuspend(resolve, reject) ?? (() => {});
-	    teardown = () => {
-	      teardown = () => {};
-	      unsuspend();
-	    }
+            teardown = () => {
+              teardown = () => {};
+              unsuspend();
+            };
           }
         } else if (control.method === "done") {
           options.done(control.result as Result<T>);
@@ -129,10 +127,10 @@ export function createControlDelimiter<T>(
       }
     },
     *delimit(op) {
-      try {	
+      try {
         return yield* op();
       } finally {
-	teardown()
+        teardown();
         if (!exit.ok) {
           // deno-lint-ignore no-unsafe-finally
           throw exit.error;
