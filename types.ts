@@ -9,14 +9,15 @@ export interface Task<T> extends Future<T> {
 }
 
 export interface Coroutine<T = unknown> extends Operation<T> {
+  name: string;
   handlers: Record<string, Delimiter>;
   reduce(routine: Coroutine, instruction: Instruction): void;
 }
 
 export interface Delimiter<TData = unknown> {
-  handler: string;
+  name: string;
   handle(data: TData, routine: Coroutine): void;
-  delimit<T>(operation: () => Operation<T>): Operation<T>;
+  delimit<T>(operation: () => Operation<T>, routine: Coroutine): Operation<T>;
 }
 
 export interface Instruction<TData = unknown> {

@@ -10,7 +10,7 @@ interface Spawn {
 export function spawnScope(): Delimiter<Spawn> {
   let tasks = new Set<Task<unknown>>();
   return {
-    handler: "@effection/spawn",
+    name: "@effection/spawn",
     handle(operation, routine) {
       let { reduce } = routine;
       let [task, child] = createTask({

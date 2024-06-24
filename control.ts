@@ -1,27 +1,27 @@
-import { Reduce } from "./reduce.ts";
+import { useSelf } from "./coroutine.ts";
 import { Err, Ok, Result } from "./result.ts";
-import { Delimiter, Instruction, Operation, Reject, Resolve } from "./types.ts";
+import { Delimiter, Instruction, Reject, Resolve } from "./types.ts";
 
 export function Done<T>(result: Result<T>): Instruction {
   return {
-    handler: "@effection/coroutine",
+    handler: "@effection/control",
     data: { method: "done", result },
   };
 }
 
 export function Resume<T>(result: Result<T>): Instruction {
   return {
-    handler: "@effection/coroutine",
+    handler: "@effection/control",
     data: { method: "resume", result },
   };
 }
 
 export function Break<T>(result: Result<T>): Instruction {
-  return { handler: "@effection/coroutine", data: { method: "break", result } };
+  return { handler: "@effection/control", data: { method: "break", result } };
 }
 
 export function Self(): Instruction<Control> {
-  return { handler: "@effection/coroutine", data: { method: "self" } };
+  return { handler: "@effection/control", data: { method: "self" } };
 }
 
 export interface Unsuspend<T> {
@@ -30,7 +30,7 @@ export interface Unsuspend<T> {
 
 export function Suspend(unsuspend?: Unsuspend<unknown>): Instruction<Control> {
   return {
-    handler: "@effection/coroutine",
+    handler: "@effection/control",
     data: { method: "suspend", unsuspend },
   };
 }
@@ -52,7 +52,6 @@ export type Control = {
 };
 
 export interface ControlOptions<T> {
-  reduce: Reduce;
   done(value: Result<T>): void;
 }
 
@@ -61,13 +60,14 @@ export function createControlDelimiter<T>(
 ): Delimiter<Control> {
   let exit = Ok();
 
-  let { reduce } = options;
+  let teardown = () => {};
 
   return {
-    handler: "@effection/coroutine",
+    name: "@effection/control",
     handle(control, routine) {
+      let { reduce, [Symbol.iterator]: instructions } = routine;
       try {
-        let iterator = routine[Symbol.iterator]();
+        let iterator = instructions();
         if (control.method === "self") {
           reduce(routine, Resume(Ok(routine)));
         } else if (control.method === "resume") {
@@ -96,7 +96,7 @@ export function createControlDelimiter<T>(
           if (iterator.return) {
             let next = iterator.return();
             if (next.done) {
-              reduce(routine, Done(Ok()));
+              reduce(routine, Done(Ok(next.value)));
             } else {
               reduce(routine, next.value);
             }
@@ -104,18 +104,22 @@ export function createControlDelimiter<T>(
             reduce(routine, Done(Ok()));
           }
         } else if (control.method === "suspend") {
-          let teardown: () => void;
+
           if (control.unsuspend) {
             let settled = false;
             let settle = (result: Result<unknown>) => {
               if (!settled) {
-                teardown();
+		teardown();
                 reduce(routine, Resume(result));
               }
             };
             let resolve = (value: unknown) => settle(Ok(value));
             let reject = (error: Error) => settle(Err(error));
-            teardown = control.unsuspend(resolve, reject) ?? (() => {});
+            let unsuspend = control.unsuspend(resolve, reject) ?? (() => {});
+	    teardown = () => {
+	      teardown = () => {};
+	      unsuspend();
+	    }
           }
         } else if (control.method === "done") {
           options.done(control.result as Result<T>);
@@ -125,9 +129,10 @@ export function createControlDelimiter<T>(
       }
     },
     *delimit(op) {
-      try {
+      try {	
         return yield* op();
       } finally {
+	teardown()
         if (!exit.ok) {
           // deno-lint-ignore no-unsafe-finally
           throw exit.error;

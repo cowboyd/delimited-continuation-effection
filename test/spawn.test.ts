@@ -177,23 +177,23 @@ describe("spawn", () => {
     ]);
   });
 
-  // // it("can catch an error spawned inside of an action", async () => {
-  // //   let error = new Error("boom!");
-  // //   let value = await run(function* () {
-  // //     try {
-  // //       yield* action(function* TheAction() {
-  // //         yield* spawn(function* TheBomb() {
-  // //           yield* sleep(1);
-  // //           throw error;
-  // //         });
-  // //         yield* sleep(5000);
-  // //       });
-  // //     } catch (err) {
-  // //       return err;
-  // //     }
-  // //   });
-  // //   expect(value).toBe(error);
-  // // });
+  it("can catch an error spawned inside of an action", async () => {
+    let error = new Error("boom!");
+    let value = await run(function* main() {
+      try {
+        yield* scoped(function* () {
+          yield* spawn(function* TheBomb() {
+            yield* sleep(1);
+            throw error;
+          });
+          yield* sleep(5000);
+        });
+      } catch (err) {
+        return err;
+      }
+    });
+    expect(value).toBe(error);
+  });
 
   it("halts children on explicit halt", async () => {
     let child;
@@ -211,3 +211,11 @@ describe("spawn", () => {
     await expect(child).rejects.toHaveProperty("message", "halted");
   });
 });
+
+import type { Operation } from "../types.ts";
+import { createControlDelimiter } from "../control.ts";
+import { delimit } from "../delimited.ts";
+
+function scoped<T>(op: () => Operation<T>): Operation<T> {
+  return delimit(createControlDelimiter({ done() {} }), op);
+}

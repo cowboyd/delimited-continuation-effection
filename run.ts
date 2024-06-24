@@ -31,6 +31,7 @@ export function createTask<T>(
   let value = createFutureWithResolvers<Maybe<T>>();
 
   let routine = createCoroutine<T>({
+    name: operation.name,
     operation: () => delimit(spawnScope(), operation),
     reduce,
     done(result) {

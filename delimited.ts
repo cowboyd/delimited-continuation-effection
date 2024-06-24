@@ -8,14 +8,14 @@ export function* delimit<T>(
   let self = yield* useSelf();
   let { handlers: original } = self;
   let delimited = Object.create(original, {
-    [delimiter.handler]: {
+    [delimiter.name]: {
       value: delimiter,
     },
   });
 
   try {
     self.handlers = delimited;
-    return yield* delimiter.delimit(op);
+    return yield* delimiter.delimit(op, self);
   } finally {
     self.handlers = original;
   }

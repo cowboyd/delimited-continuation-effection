@@ -3,6 +3,7 @@ import { Reduce } from "./reduce.ts";
 import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
 
 export interface CoroutineOptions<T> extends ControlOptions<T> {
+  name?: string;
   operation(): Operation<T>;
   reduce: Reduce;
   parent?: Record<string, Delimiter>;
@@ -22,15 +23,16 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 
   let iterator: Iterator<Instruction, T, unknown> | undefined = undefined;
 
-  let { handle, delimit } = createControlDelimiter(options);
+  let { handle, delimit } = createControlDelimiter({ done: options.done });
 
   let handlers = Object.create(parent, {
-    "@effection/coroutine": { value: { handle } },
+    "@effection/control": { value: { handle } },
   });
 
-  let operation = () => delimit(options.operation);
+  let operation = () => delimit(options.operation, routine);
 
   let routine: Coroutine<T> = {
+    name: options.name || options.operation.name,
     handlers,
     reduce,
     [Symbol.iterator]() {
