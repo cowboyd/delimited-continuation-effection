@@ -52,7 +52,6 @@ export type Control = {
 };
 
 export interface ControlOptions<T> {
-  operation(): Operation<T>;
   reduce: Reduce;
   done(value: Result<T>): void;
 }
@@ -60,14 +59,6 @@ export interface ControlOptions<T> {
 export function createControlDelimiter<T>(
   options: ControlOptions<T>,
 ): Delimiter<Control> {
-  let iterator: Iterator<Instruction, T, unknown> | undefined = undefined;
-  let instructions = () => {
-    if (!iterator) {
-      iterator = options.operation()[Symbol.iterator]();
-    }
-    return iterator;
-  };
-
   let exit = Ok();
 
   let { reduce } = options;
@@ -76,7 +67,7 @@ export function createControlDelimiter<T>(
     handler: "@effection/coroutine",
     handle(control, routine) {
       try {
-        let iterator = instructions();
+        let iterator = routine[Symbol.iterator]();
         if (control.method === "self") {
           reduce(routine, Resume(Ok(routine)));
         } else if (control.method === "resume") {

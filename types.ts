@@ -8,7 +8,7 @@ export interface Task<T> extends Future<T> {
   halt(): Future<void>;
 }
 
-export interface Coroutine {
+export interface Coroutine<T = unknown> extends Operation<T> {
   handlers: Record<string, Delimiter>;
   reduce(routine: Coroutine, instruction: Instruction): void;
 }
