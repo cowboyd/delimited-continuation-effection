@@ -59,7 +59,7 @@ export function createControlDelimiter<T>(
 ): Delimiter<Control> {
   let exit = Ok();
 
-  let teardown = () => {};
+  let exitSuspendPoint = () => {};
 
   return {
     name: "@effection/control",
@@ -70,6 +70,7 @@ export function createControlDelimiter<T>(
         if (control.method === "self") {
           reduce(routine, Resume(Ok(routine)));
         } else if (control.method === "resume") {
+          exitSuspendPoint();
           let result = control.result;
           if (result.ok) {
             let next = iterator.next(result.value);
@@ -89,6 +90,7 @@ export function createControlDelimiter<T>(
             throw result.error;
           }
         } else if (control.method === "break") {
+          exitSuspendPoint();
           if (!control.result.ok) {
             exit = control.result;
           }
@@ -107,15 +109,15 @@ export function createControlDelimiter<T>(
             let settled = false;
             let settle = (result: Result<unknown>) => {
               if (!settled) {
-                teardown();
+                exitSuspendPoint();
                 reduce(routine, Resume(result));
               }
             };
             let resolve = (value: unknown) => settle(Ok(value));
             let reject = (error: Error) => settle(Err(error));
             let unsuspend = control.unsuspend(resolve, reject) ?? (() => {});
-            teardown = () => {
-              teardown = () => {};
+            exitSuspendPoint = () => {
+              exitSuspendPoint = () => {};
               unsuspend();
             };
           }
@@ -130,7 +132,6 @@ export function createControlDelimiter<T>(
       try {
         return yield* op();
       } finally {
-        teardown();
         if (!exit.ok) {
           // deno-lint-ignore no-unsafe-finally
           throw exit.error;

@@ -3,14 +3,15 @@ import { Ok } from "./result.ts";
 import { createTask } from "./run.ts";
 import type { Delimiter, Instruction, Operation, Task } from "./types.ts";
 
-interface Spawn {
-  (): Operation<unknown>;
-}
+type Spawn = () => Operation<unknown>;
 
 export function spawnScope(): Delimiter<Spawn> {
   let tasks = new Set<Task<unknown>>();
   return {
     name: "@effection/spawn",
+
+    // handle spawns that happen within the scope of this delimiter
+    // and add them to the set of tasks
     handle(operation, routine) {
       let { reduce } = routine;
       let [task, child] = createTask({
@@ -28,6 +29,8 @@ export function spawnScope(): Delimiter<Spawn> {
       reduce(child, Resume(Ok()));
     },
 
+    // run the delimited operation, and then halt all
+    // tasks created within it afterwards
     *delimit(operation) {
       try {
         return yield* operation();
