@@ -74,6 +74,22 @@ function coroutineHandlers(): Record<string, InstructionHandler<Control>> {
           } else {
             throw result.error;
           }
+        } else if (control.method === "break") {
+          exitSuspendPoint();
+          // TODO where is this delimiter
+          // if (!control.result.ok) {
+          //   exit = control.result;
+          // }
+          if (iterator.return) {
+            let next = iterator.return();
+            if (next.done) {
+              routine.next(Done(Ok(next.value)));
+            } else {
+              routine.next(next.value);
+            }
+          } else {
+            routine.next(Done(Ok()));
+          }
         } else if (control.method === "suspend") {
           if (control.unsuspend) {
             let settled = false;
