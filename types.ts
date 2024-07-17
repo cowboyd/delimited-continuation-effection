@@ -8,21 +8,31 @@ export interface Task<T> extends Future<T> {
   halt(): Future<void>;
 }
 
-export interface Coroutine<T = unknown> extends Operation<T> {
+export interface Coroutine<T = unknown> {
   name: string;
-  handlers: Record<string, Delimiter>;
-  reduce(routine: Coroutine, instruction: Instruction): void;
+  handlers: Record<string, InstructionHandler>;
+  instructions(): Iterator<Instruction, T, unknown>;
+  with<T>(
+    handlers: Record<string, InstructionHandler>,
+    op: (routine: Coroutine) => Operation<T>,
+  ): Operation<T>;
+  next<I>(instruction: Instruction<I>): void;
 }
 
-export interface Delimiter<TData = unknown> {
-  name: string;
-  handle(data: TData, routine: Coroutine): void;
-  delimit<T>(operation: () => Operation<T>, routine: Coroutine): Operation<T>;
+export interface Delimiter<T, TReturn = T> {
+  (
+    routine: Coroutine,
+    resume: (routine: Coroutine) => Operation<T>,
+  ): Operation<TReturn>;
 }
 
 export interface Instruction<TData = unknown> {
   handler: string;
   data: TData;
+}
+
+export interface InstructionHandler<TData = unknown> {
+  (routine: Coroutine, data: TData): void;
 }
 
 export type Resolve<T> = (value: T) => void;

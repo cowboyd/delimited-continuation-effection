@@ -1,12 +1,6 @@
-import { Resume } from "./control.ts";
 import { Err } from "./result.ts";
-import { Coroutine, Instruction } from "./types.ts";
 
-export interface Reduce {
-  (routine: Coroutine, instruction: Instruction): void;
-}
-
-export class Reducer {
+class Reducer {
   reducing = false;
   readonly queue: [Coroutine, Instruction][] = [];
 
@@ -21,14 +15,14 @@ export class Reducer {
       let item = queue.pop();
       while (item) {
         [routine, instruction] = item;
-        let { handler, data } = instruction;
-        let delimiter = routine.handlers[handler];
-        if (!delimiter) {
-          let error = new Error(handler);
+        let { handler: handlerName, data } = instruction;
+        let handler = routine.handlers[handlerName];
+        if (!handler) {
+          let error = new Error(handlerName);
           error.name = `UnknownHandler`;
           this.reduce(routine, Resume(Err(error)));
         } else {
-          delimiter.handle(data, routine);
+          handler(routine, data);
         }
         item = queue.pop();
       }
