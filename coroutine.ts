@@ -1,32 +1,41 @@
+// deno-lint-ignore-file no-unsafe-finally
 import { Control, Done, Resume } from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
-import type {
-  Coroutine,
-  Instruction,
-  InstructionHandler,
-  Operation,
-} from "./types.ts";
+import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
 
 export interface CoroutineOptions<T> {
   name?: string;
   operation(routine: Coroutine): Operation<T>;
   reducer?: Reducer;
-  handlers?: Record<string, InstructionHandler>;
+  delimiters: Delimiter<T, T, any>[];
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
-  let { operation, reducer = new Reducer(), name = options.operation.name } =
-    options;
+  let {
+    operation,
+    reducer = new Reducer(),
+    name = options.operation.name,
+    delimiters,
+  } = options;
 
-  let iterator: Iterator<Instruction, T, unknown> | undefined;
+  let iterator: Iterator<Instruction, T, unknown> | undefined;  
+
+  let handlers = Object.assign(
+    Object.create(null),
+    ...delimiters.map((d) => d.handlers),
+  );
+
+  let delimit = options.delimiters.reduceRight((delimit, current) => {
+    return (routine, next) => current.delimit(routine, (routine) => delimit(routine, next));
+  }, (routine: Coroutine, next: (routine: Coroutine) => Operation<T>) => next(routine));
+
 
   let routine: Coroutine<T> = {
     name,
-    handlers: options.handlers ??
-      coroutineHandlers() as Record<string, InstructionHandler>,
+    handlers,
     instructions() {
       if (!iterator) {
-        iterator = operation(routine)[Symbol.iterator]();
+        iterator = delimit(routine, operation)[Symbol.iterator]();
       }
       return iterator;
     },
@@ -44,73 +53,84 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     },
     next: (instruction) => reducer.reduce(routine, instruction),
   };
+
   return routine;
 }
 
-function coroutineHandlers(): Record<string, InstructionHandler<Control>> {
-  //TODO: contextualize e.g. let exit = routine.var("@effection/control.unsuspend", () => {});
+export function delimitControl<T>(): Delimiter<T, T, Control> {
   let exitSuspendPoint = () => {};
 
+  let escape: Result<void> | void = void (0);
+
   return {
-    ["@effection/coroutine"](routine, control) {
+    delimit: function* control(routine, next) {
       try {
-        const iterator = routine.instructions();
-        if (control.method === "resume") {
-          let result = control.result;
-          if (result.ok) {
-            let next = iterator.next(result.value);
-            if (next.done) {
-              routine.next(Done(Ok(next.value)));
-            } else {
-              routine.next(next.value);
-            }
-          } else if (iterator.throw) {
-            let next = iterator.throw(result.error);
-            if (next.done) {
-              routine.next(Done(Ok(next.value)));
-            } else {
-              routine.next(next.value);
-            }
-          } else {
-            throw result.error;
-          }
-        } else if (control.method === "break") {
-          exitSuspendPoint();
-          // TODO where is this delimiter
-          // if (!control.result.ok) {
-          //   exit = control.result;
-          // }
-          if (iterator.return) {
-            let next = iterator.return();
-            if (next.done) {
-              routine.next(Done(Ok(next.value)));
-            } else {
-              routine.next(next.value);
-            }
-          } else {
-            routine.next(Done(Ok()));
-          }
-        } else if (control.method === "suspend") {
-          if (control.unsuspend) {
-            let settled = false;
-            let settle = (result: Result<unknown>) => {
-              if (!settled) {
-                exitSuspendPoint();
-                routine.next(Resume(result));
-              }
-            };
-            let resolve = (value: unknown) => settle(Ok(value));
-            let reject = (error: Error) => settle(Err(error));
-            let unsuspend = control.unsuspend(resolve, reject) ?? (() => {});
-            exitSuspendPoint = () => {
-              exitSuspendPoint = () => {};
-              unsuspend();
-            };
-          }
+        return yield* next(routine);
+      } finally {
+        if (escape && !escape.ok) {
+          let { error } = escape;
+          throw error;
         }
-      } catch (error) {
-        routine.next(Done(Err(error)));
       }
+    },
+    handlers: {
+      ["@effection/coroutine"](routine: Coroutine, control: Control) {
+        try {
+          const iterator = routine.instructions();
+          if (control.method === "resume") {
+            let result = control.result;
+            if (result.ok) {
+              let next = iterator.next(result.value);
+              if (next.done) {
+                routine.next(Done(Ok(next.value)));
+              } else {
+                routine.next(next.value);
+              }
+            } else if (iterator.throw) {
+              let next = iterator.throw(result.error);
+              if (next.done) {
+                routine.next(Done(Ok(next.value)));
+              } else {
+                routine.next(next.value);
+              }
+            } else {
+              throw result.error;
+            }
+          } else if (control.method === "break") {
+            escape = control.result;
+            exitSuspendPoint();
+            if (iterator.return) {
+              let next = iterator.return();
+              if (next.done) {
+                routine.next(Done(Ok(next.value)));
+              } else {
+                routine.next(next.value);
+              }
+            } else {
+              routine.next(Done(Ok()));
+            }
+          } else if (control.method === "suspend") {
+            if (control.unsuspend) {
+              let settled = false;
+              let settle = (result: Result<unknown>) => {
+                if (!settled) {
+                  exitSuspendPoint();
+                  routine.next(Resume(result));
+                }
+              };
+              let resolve = (value: unknown) => settle(Ok(value));
+              let reject = (error: Error) => settle(Err(error));
+              let unsuspend = control.unsuspend(resolve, reject) ?? (() => {});
+              exitSuspendPoint = () => {
+                exitSuspendPoint = () => {};
+                unsuspend();
+              };
+            }
+          }
+        } catch (error) {
+          routine.next(Done(Err(error)));
+        }
+      },
     },
   };
 }

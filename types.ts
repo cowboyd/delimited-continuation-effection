@@ -1,3 +1,5 @@
+// deno-lint-ignore-file no-explicit-any
+
 export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
 }
@@ -13,16 +15,17 @@ export interface Coroutine<T = unknown> {
   handlers: Record<string, InstructionHandler>;
   instructions(): Iterator<Instruction, T, unknown>;
   with<T>(
-    handlers: Record<string, InstructionHandler>,
+    handlers: Record<string, InstructionHandler<any>>,
     op: (routine: Coroutine) => Operation<T>,
   ): Operation<T>;
   next<I>(instruction: Instruction<I>): void;
 }
 
-export interface Delimiter<T, TReturn = T> {
-  (
+export interface Delimiter<T, TReturn = T, TData = unknown> {
+  handlers?: Record<string, InstructionHandler<TData>>;
+  delimit(
     routine: Coroutine,
-    resume: (routine: Coroutine) => Operation<T>,
+    next: (routine: Coroutine) => Operation<T>,
   ): Operation<TReturn>;
 }
 

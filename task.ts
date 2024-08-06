@@ -1,24 +1,20 @@
 import { Break, Resume } from "./control.ts";
-import { createCoroutine } from "./coroutine.ts";
+import { createCoroutine, delimitControl } from "./coroutine.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
-import { Ok } from "./result.ts";
+import { Err, Ok } from "./result.ts";
+import { Delimiter, Instruction, InstructionHandler } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
-export interface Delimiter<T, TReturn = T> {
-  (
-    routine: Coroutine,
-    resume: (routine: Coroutine) => Operation<T>,
-  ): Operation<TReturn>;
-}
-
-export function createTask<T>(op: () => Operation<T>): Task<T> {
+export function createTask<T>(operation: () => Operation<T>): Task<T> {
   let result = createFutureWithResolvers<T>();
   let finalized = createFutureWithResolvers<void>();
 
-  let operation = (routine: Coroutine) =>
-    delimitTask(result, finalized)(routine, op);
+  let delimiters = [
+    delimitTask(result, finalized),
+    delimitControl(),
+  ];
 
-  let routine = createCoroutine({ operation });
+  let routine = createCoroutine({ operation, delimiters });
 
   routine.next(Resume(Ok()));
 
@@ -38,40 +34,79 @@ export function createTask<T>(op: () => Operation<T>): Task<T> {
   });
 }
 
+export function spawn<T>(op: () => Operation<T>): Operation<Task<T>> {
+  return {
+    *[Symbol.iterator]() {
+      return (yield { handler: "@effection/task.spawn", data: op }) as Task<T>;
+    },
+  };
+}
+
 function delimitTask<T>(
   result: FutureWithResolvers<T>,
   finalized: FutureWithResolvers<void>,
-): Delimiter<T, void> {
-  return function* task(routine, resume) {
-    try {
-      result.resolve(yield* routine.with({}, resume));
-    } catch (error) {
-      result.reject(error);
-      finalized.reject(error);
-    } finally {
-      finalized.resolve();
-      result.reject(new Error("halted"));
-    }
+): Delimiter<T, void, () => Operation<unknown>> {
+  let state = { halted: false };
+
+  return {
+    delimit: function* task(routine, resume) {
+      try {
+        let value = yield* resume(routine);
+
+        if (!state.halted) {
+          result.resolve(value);
+        }
+      } catch (error) {
+        result.reject(error);
+        finalized.reject(error);
+      } finally {
+        finalized.resolve();
+        if (state.halted) {
+          result.reject(new Error("halted"));
+        }
+      }
+    },
+    handlers: {
+      ["@effection/task.halt"](routine: Coroutine) {
+        if (!state.halted) {
+          state.halted = true;
+          routine.next(Break(Ok()));
+        }
+      },
+      ["@effection/task.spawn"](
+        routine: Coroutine,
+        op: () => Operation<unknown>,
+      ) {
+        let task = createTask(function* () {
+          try {
+            return yield* op();
+          } catch (error) {
+            routine.next(Break(Err(error)));
+            throw error;
+          }
+        });
+	routine.next(Resume(Ok(task)));
+      },
+    },
   };
+}
+
+function Halt(): Instruction<void> {
+  return { handler: "@effection/task.halt" } as Instruction<void>;
 }
 
 function createHalt(
   routine: Coroutine,
   finalized: Future<void>,
 ): Future<void> {
-  let interrupt = () => {
-    interrupt = () => {};
-    routine.next(Break(Ok()));
-  };
-
   return {
     [Symbol.toStringTag]: "Future",
     *[Symbol.iterator]() {
-      interrupt();
+      routine.next(Halt());
       return yield* finalized;
     },
     then: (fn, ...args) => {
-      interrupt();
+      routine.next(Halt());
       if (fn) {
         return finalized.then(() => fn(), ...args);
       } else {
