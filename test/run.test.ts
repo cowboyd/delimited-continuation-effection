@@ -277,7 +277,6 @@ describe("run()", () => {
       try {
         yield* suspend();
       } finally {
-        // deno-lint-ignore no-unsafe-finally
         throw new Error("bang");
       }
     });

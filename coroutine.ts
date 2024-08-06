@@ -1,4 +1,4 @@
-// deno-lint-ignore-file no-unsafe-finally
+// deno-lint-ignore-file no-explicit-any
 import { Control, Done, Resume } from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
 import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
@@ -71,8 +71,8 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
       try {
         return yield* next(routine);
       } catch (error) {
-	escape = Err(error);
-	throw error;
+        escape = Err(error);
+        throw error;
       } finally {
         if (escape && !escape.ok) {
           let { error } = escape;

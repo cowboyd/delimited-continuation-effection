@@ -2,7 +2,7 @@ import { Break, Resume } from "./control.ts";
 import { createCoroutine, delimitControl } from "./coroutine.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Delimiter, Instruction, InstructionHandler } from "./types.ts";
+import { Delimiter, Instruction } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
 export function createTask<T>(operation: () => Operation<T>): Task<T> {
