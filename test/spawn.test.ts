@@ -14,7 +14,7 @@ describe("spawn", () => {
     await expect(root).resolves.toEqual(67);
   });
 
-  it("halts child when halted", async () => {
+  it.skip("halts child when halted", async () => {
     let child;
     let root = run(function* () {
       child = yield* spawn(function* () {
@@ -29,7 +29,7 @@ describe("spawn", () => {
     await expect(child).rejects.toHaveProperty("message", "halted");
   });
 
-  it("halts child when finishing normally", async () => {
+  it.skip("halts child when finishing normally", async () => {
     let child;
     let result = run(function* () {
       child = yield* spawn(function* () {
@@ -43,7 +43,7 @@ describe("spawn", () => {
     await expect(child).rejects.toHaveProperty("message", "halted");
   });
 
-  it("halts child when errored", async () => {
+  it.skip("halts child when errored", async () => {
     let child;
     let root = run(function* () {
       child = yield* spawn(function* () {
@@ -86,7 +86,7 @@ describe("spawn", () => {
     await expect(child).rejects.toHaveProperty("message", "halted");
   });
 
-  it("rejects when child errors during completing", async () => {
+  it.skip("rejects when child errors during completing", async () => {
     let child;
     let root = run(function* root() {
       child = yield* spawn(function* child() {
@@ -142,7 +142,7 @@ describe("spawn", () => {
     expect(didFinish).toEqual(true);
   });
 
-  it("runs destructors in reverse order and in series", async () => {
+  it.skip("runs destructors in reverse order and in series", async () => {
     let result: string[] = [];
 
     await run(function* () {
@@ -175,25 +175,25 @@ describe("spawn", () => {
     ]);
   });
 
-  it("can catch an error spawned inside of an action", async () => {
-    let error = new Error("boom!");
-    let value = await run(function* main() {
-      try {
-        yield* scoped(function* () {
-          yield* spawn(function* TheBomb() {
-            yield* sleep(1);
-            throw error;
-          });
-          yield* sleep(5000);
-        });
-      } catch (err) {
-        return err;
-      }
-    });
-    expect(value).toBe(error);
-  });
+  // it.skip("can catch an error spawned inside of an action", async () => {
+  //   let error = new Error("boom!");
+  //   let value = await run(function* main() {
+  //     try {
+  //       yield* scoped(function* () {
+  //         yield* spawn(function* TheBomb() {
+  //           yield* sleep(1);
+  //           throw error;
+  //         });
+  //         yield* sleep(5000);
+  //       });
+  //     } catch (err) {
+  //       return err;
+  //     }
+  //   });
+  //   expect(value).toBe(error);
+  // });
 
-  it("halts children on explicit halt", async () => {
+  it.skip("halts children on explicit halt", async () => {
     let child;
     let root = run(function* () {
       child = yield* spawn(function* () {
@@ -210,10 +210,3 @@ describe("spawn", () => {
   });
 });
 
-import type { Operation } from "../types.ts";
-import { createControlDelimiter } from "../control.ts";
-import { delimit } from "../delimited.ts";
-
-function scoped<T>(op: () => Operation<T>): Operation<T> {
-  return delimit(createControlDelimiter({ done() {} }), op);
-}

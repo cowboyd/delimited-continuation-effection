@@ -34,14 +34,6 @@ export function createTask<T>(operation: () => Operation<T>): Task<T> {
   });
 }
 
-export function spawn<T>(op: () => Operation<T>): Operation<Task<T>> {
-  return {
-    *[Symbol.iterator]() {
-      return (yield { handler: "@effection/task.spawn", data: op }) as Task<T>;
-    },
-  };
-}
-
 function delimitTask<T>(
   result: FutureWithResolvers<T>,
   finalized: FutureWithResolvers<void>,
