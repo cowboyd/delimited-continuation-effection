@@ -18,17 +18,21 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     delimiters,
   } = options;
 
-  let iterator: Iterator<Instruction, T, unknown> | undefined;  
+  let iterator: Iterator<Instruction, T, unknown> | undefined;
 
   let handlers = Object.assign(
     Object.create(null),
     ...delimiters.map((d) => d.handlers),
   );
 
-  let delimit = options.delimiters.reduceRight((delimit, current) => {
-    return (routine, next) => current.delimit(routine, (routine) => delimit(routine, next));
-  }, (routine: Coroutine, next: (routine: Coroutine) => Operation<T>) => next(routine));
-
+  let delimit = options.delimiters.reduceRight(
+    (delimit, current) => {
+      return (routine, next) =>
+        current.delimit(routine, (routine) => delimit(routine, next));
+    },
+    (routine: Coroutine, next: (routine: Coroutine) => Operation<T>) =>
+      next(routine),
+  );
 
   let routine: Coroutine<T> = {
     name,
@@ -98,7 +102,11 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
             }
           } else if (control.method === "break") {
             escape = control.result;
-            exitSuspendPoint();
+            try {
+              exitSuspendPoint();
+            } catch (error) {
+              escape = Err(error);
+            }
             if (iterator.return) {
               let next = iterator.return();
               if (next.done) {
@@ -120,11 +128,16 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
               };
               let resolve = (value: unknown) => settle(Ok(value));
               let reject = (error: Error) => settle(Err(error));
-              let unsuspend = control.unsuspend(resolve, reject) ?? (() => {});
-              exitSuspendPoint = () => {
-                exitSuspendPoint = () => {};
-                unsuspend();
-              };
+              try {
+                let unsuspend = control.unsuspend(resolve, reject) ??
+                  (() => {});
+                exitSuspendPoint = () => {
+                  exitSuspendPoint = () => {};
+                  unsuspend();
+                };
+              } catch (error) {
+                routine.next(Resume(Err(error)));
+              }
             }
           }
         } catch (error) {

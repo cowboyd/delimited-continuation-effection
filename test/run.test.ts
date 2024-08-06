@@ -246,54 +246,73 @@ describe("run()", () => {
     expect(didRun).toEqual(true);
   });
 
-  // it("handles error in entering suspend point", () => {});
-  // it("handles errors in exiting suspend points", () => {});
+  it("handles error in entering suspend point", async () => {
+    let error = new Error("boom!");
+    let task = run(function* () {
+      yield* suspend(() => {
+        throw error;
+      });
+    });
 
-  // it("can throw error when child blows up", async () => {
-  //   let task = run(function* Main() {
-  //     yield* spawn(function* Boomer() {
-  //       yield* sleep(5);
-  //       throw new Error("boom");
-  //     });
-  //     try {
-  //       yield* suspend();
-  //     } finally {
-  //       // deno-lint-ignore no-unsafe-finally
-  //       throw new Error("bang");
-  //     }
-  //   });
+    await expect(task).rejects.toEqual(error);
+  });
 
-  //   await expect(task).rejects.toHaveProperty("message", "bang");
-  // });
+  it("handles errors in exiting suspend points", async () => {
+    let error = new Error("boom!");
+    let task = run(function* () {
+      yield* suspend(() => () => {
+        throw error;
+      });
+    });
 
-  // it("propagates errors", async () => {
-  //   try {
-  //     await run(function* () {
-  //       throw new Error("boom");
-  //     });
-  //     throw new Error("expected error to propagate");
-  //   } catch (error) {
-  //     expect(error.message).toEqual("boom");
-  //   }
-  // });
+    await expect(task.halt()).rejects.toEqual(error);
+  });
 
-  // it("propagates errors from promises", async () => {
-  //   try {
-  //     await run(function* () {
-  //       yield* Promise.reject(new Error("boom"));
-  //     });
-  //     throw new Error("expected error to propagate");
-  //   } catch (error) {
-  //     expect(error.message).toEqual("boom");
-  //   }
-  // });
+  it.skip("can throw error when child blows up", async () => {
+    let task = run(function* Main() {
+      yield* spawn(function* Boomer() {
+        yield* sleep(5);
+        throw new Error("boom");
+      });
+      try {
+        yield* suspend();
+      } finally {
+        // deno-lint-ignore no-unsafe-finally
+        throw new Error("bang");
+      }
+    });
 
-  // it("successfully halts when task fails, but shutdown succeeds ", async () => {
-  //   let task = run(function* () {
-  //     throw new Error("boom!");
-  //   });
+    await expect(task).rejects.toHaveProperty("message", "bang");
+  });
 
-  //   await expect(task).rejects.toHaveProperty("message", "boom!");
-  //   await expect(run(task.halt)).resolves.toBe(undefined);
-  // });
+  it("propagates errors", async () => {
+    try {
+      await run(function* () {
+        throw new Error("boom");
+      });
+      throw new Error("expected error to propagate");
+    } catch (error) {
+      expect(error.message).toEqual("boom");
+    }
+  });
+
+  it("propagates errors from promises", async () => {
+    try {
+      await run(function* () {
+        yield* Promise.reject(new Error("boom"));
+      });
+      throw new Error("expected error to propagate");
+    } catch (error) {
+      expect(error.message).toEqual("boom");
+    }
+  });
+
+  it.skip("successfully halts when task fails, but shutdown succeeds ", async () => {
+    let task = run(function* () {
+      throw new Error("boom!");
+    });
+
+    await expect(task).rejects.toHaveProperty("message", "boom!");
+    await expect(task.halt()).resolves.toBe(undefined);
+  });
 });
