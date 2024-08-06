@@ -70,6 +70,9 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
     delimit: function* control(routine, next) {
       try {
         return yield* next(routine);
+      } catch (error) {
+	escape = Err(error);
+	throw error;
       } finally {
         if (escape && !escape.ok) {
           let { error } = escape;
