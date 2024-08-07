@@ -12,6 +12,7 @@ export function createTask<T>(operation: () => Operation<T>): Task<T> {
   let delimiters = [
     delimitTask(result, finalized),
     delimitControl(),
+    delimitSpawn(),
   ];
 
   let routine = createCoroutine({ operation, delimiters });
@@ -32,6 +33,52 @@ export function createTask<T>(operation: () => Operation<T>): Task<T> {
       value: halt,
     },
   });
+}
+
+function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
+  let children = new Set<Task<unknown>>();
+  return {
+    handlers: {
+      ["@effection/task.spawn"]<T>(
+        routine: Coroutine,
+        op: () => Operation<T>,
+      ) {
+        let task = createTask(function* () {
+          try {
+            return yield* op();
+          } catch (error) {
+            routine.next(Break(Err(error)));
+            throw error;
+          } finally {
+            if (typeof task !== "undefined") {
+              children.delete(task);
+            }
+          }
+        });
+        children.add(task);
+        routine.next(Resume(Ok(task)));
+      },
+    },
+    delimit: function* spawnScope(routine, next) {
+      try {
+        return yield* next(routine);
+      } finally {
+        let teardown = Ok();
+        while (children.size > 0) {
+          for (let child of [...children].reverse()) {
+            try {
+              yield* child.halt();
+            } catch (error) {
+              teardown = Err(error);
+            }
+          }
+        }
+        if (!teardown.ok) {
+          throw teardown.error;
+        }
+      }
+    },
+  };
 }
 
 function delimitTask<T>(
@@ -64,20 +111,6 @@ function delimitTask<T>(
           state.halted = true;
           routine.next(Break(Ok()));
         }
-      },
-      ["@effection/task.spawn"](
-        routine: Coroutine,
-        op: () => Operation<unknown>,
-      ) {
-        let task = createTask(function* () {
-          try {
-            return yield* op();
-          } catch (error) {
-            routine.next(Break(Err(error)));
-            throw error;
-          }
-        });
-        routine.next(Resume(Ok(task)));
       },
     },
   };
