@@ -1,7 +1,14 @@
 import { Result } from "./result.ts";
 import { Instruction, Reject, Resolve } from "./types.ts";
 
-export type Control = Resume | Suspend | Break | Done;
+export type Control =
+  | Resume
+  | Suspend
+  | Break
+  | Done
+  | Pushmark
+  | Errormark
+  | Popmark;
 
 export interface Done {
   method: "done";
@@ -49,4 +56,32 @@ export interface Break {
 
 export function Break(result: Result<void>): Instruction<Break> {
   return { handler: "@effection/coroutine", data: { method: "break", result } };
+}
+
+export interface Pushmark {
+  method: "pushmark";
+}
+
+export function Pushmark(): Instruction<Pushmark> {
+  return { handler: "@effection/coroutine", data: { method: "pushmark" } };
+}
+
+export interface Errormark {
+  method: "errormark";
+  error: Error;
+}
+
+export function Errormark(error: Error): Instruction<Errormark> {
+  return {
+    handler: "@effection/coroutine",
+    data: { method: "errormark", error },
+  };
+}
+
+export interface Popmark {
+  method: "popmark";
+}
+
+export function Popmark(): Instruction<Popmark> {
+  return { handler: "@effection/coroutine", data: { method: "popmark" } };
 }

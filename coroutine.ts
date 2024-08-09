@@ -1,5 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-import { Control, Done, Resume, Suspend } from "./control.ts";
+import {
+  Control,
+  Done,
+  Errormark,
+  Popmark,
+  Pushmark,
+  Resume,
+  Suspend,
+} from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
 import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
 
@@ -51,20 +59,17 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 }
 
 export function delimitControl<T>(): Delimiter<T, T, Control> {
-  let escape: Result<void> | void = void (0);
+  let marks: Result<void>[] = [];
 
   return {
     delimit: function* control(routine, next) {
       try {
+        yield Pushmark();
         return yield* next(routine);
       } catch (error) {
-        escape = Err(error);
-        throw error;
+        throw yield Errormark(error);
       } finally {
-        if (escape && !escape.ok) {
-          let { error } = escape;
-          throw error;
-        }
+        yield Popmark();
       }
     },
     handlers: {
@@ -91,17 +96,23 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
               throw result.error;
             }
           } else if (control.method === "break") {
-            escape = control.result;
-            if (iterator.return) {
-              let next = iterator.return();
-              if (next.done) {
-                routine.next(Done(Ok(next.value)));
+            let mark = marks.pop();
+            if (mark) {
+              marks.push(control.result);
+              if (iterator.return) {
+		let next = iterator.return();
+		if (next.done) {
+                  routine.next(Done(Ok(next.value)));
+		} else {
+                  routine.next(next.value);
+		}
               } else {
-                routine.next(next.value);
+		routine.next(Done(Ok()));
               }
             } else {
-              routine.next(Done(Ok()));
+	      routine.next(Resume(Err(new Error(`cannot break without an active mark`))));
             }
+
           } else if (control.method === "suspend") {
             if (control.unsuspend) {
               let { unsuspend } = control;
@@ -115,16 +126,37 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
               let resolve = (value: unknown) => settle(Ok(value));
               let reject = (error: Error) => settle(Err(error));
 
-              routine.next(Resume(Ok({
-                *[Symbol.iterator]() {
-                  let exit = unsuspend(resolve, reject);
-                  try {
-                    return (yield Suspend()) as unknown;
-                  } finally {
-                    exit && exit();
-                  }
-                },
-              })));
+              routine.next(Resume(Ok((function* suspend() {
+                let exit = unsuspend(resolve, reject) ?? (() => {});
+                try {
+                  return (yield Suspend()) as unknown;
+                } finally {
+                  exit();
+                }
+              })())));
+            }
+          } else if (control.method === "pushmark") {
+            marks.push(Ok());
+            routine.next(Resume(Ok()));
+          } else if (control.method === "popmark") {
+            let mark = marks.pop() ?? Ok();
+            routine.next(Resume(mark));
+          } else if (control.method === "errormark") {
+            let mark = marks.pop();
+            if (mark) {
+              mark = Err(control.error);
+              marks.push(mark);
+              routine.next(Resume(mark));
+            } else {
+              routine.next(
+                Resume(
+                  Err(
+                    new Error(
+                      `no active mark to set error`,
+                    ),
+                  ),
+                ),
+              );
             }
           }
         } catch (error) {

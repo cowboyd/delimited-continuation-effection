@@ -31,7 +31,7 @@ describe("spawn", () => {
 
   it("halts child when finishing normally", async () => {
     let child;
-    let result = run(function* () {
+    let result = run(function* parent() {
       child = yield* spawn(function* () {
         yield* suspend();
       });

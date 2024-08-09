@@ -80,7 +80,9 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
               yield* child.halt();
             } catch (error) {
               teardown = Err(error);
-            }
+            } finally {
+	      children.delete(child);
+	    }
           }
         }
         if (!teardown.ok) {
