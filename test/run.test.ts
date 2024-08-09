@@ -193,7 +193,6 @@ describe("run()", () => {
   it("can be halted while in the generator", async () => {
     let task = run(function* Main() {
       yield* spawn(function* Boomer() {
-        yield* sleep(2);
         throw new Error("boom");
       });
 
@@ -205,7 +204,7 @@ describe("run()", () => {
 
   it("can halt itself", async () => {
     let task: Task<void> = run(function* () {
-      yield* sleep(3);
+      yield* sleep(0);
       yield* task.halt();
     });
 
@@ -214,7 +213,7 @@ describe("run()", () => {
 
   it("can halt itself between yield points", async () => {
     let task: Task<void> = run(function* root() {
-      yield* sleep(1);
+      yield* sleep(0);
 
       yield* spawn(function* child() {
         yield* task.halt();
@@ -223,7 +222,7 @@ describe("run()", () => {
       yield* suspend();
     });
 
-    await expect(task).rejects.toHaveProperty("message", "halted");
+    await expect(task).rejects.toMatchObject({ message: "halted" });
   });
 
   it("can delay halt if child fails", async () => {

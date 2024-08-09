@@ -197,8 +197,13 @@ describe("spawn", () => {
     let child;
     let root = run(function* () {
       child = yield* spawn(function* () {
-        yield* sleep(20);
-        return "foo";
+        try {
+          yield* sleep(20);
+
+          return "foo";
+        } finally {
+          //	  console.log('bye')
+        }
       });
 
       return 1;

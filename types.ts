@@ -1,4 +1,3 @@
-
 export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
 }

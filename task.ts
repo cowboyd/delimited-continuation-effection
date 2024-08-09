@@ -10,7 +10,7 @@ export interface TaskOptions<T> {
   reduce?(routine: Coroutine, instruction: Instruction): void;
 }
 
-export function createTask<T>(options: TaskOptions<T>): Task<T> {
+export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   let { operation, reduce } = options;
   let result = createFutureWithResolvers<T>();
   let finalized = createFutureWithResolvers<void>();
@@ -23,13 +23,11 @@ export function createTask<T>(options: TaskOptions<T>): Task<T> {
 
   let routine = createCoroutine({ operation, reduce, delimiters });
 
-  routine.next(Resume(Ok()));
-
   let halted: Future<void> | undefined = void 0;
 
   let halt = () => halted ? halted : createHalt(routine, finalized.future);
 
-  return Object.create(result.future, {
+  let task: Task<T> = Object.create(result.future, {
     [Symbol.toStringTag]: {
       enumerable: false,
       value: "Task",
@@ -39,6 +37,8 @@ export function createTask<T>(options: TaskOptions<T>): Task<T> {
       value: halt,
     },
   });
+
+  return [() => routine.next(Resume(Ok())), task];
 }
 
 function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
@@ -49,8 +49,8 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
         routine: Coroutine,
         op: () => Operation<T>,
       ) {
-        let task = createTask({
-          operation: function* () {
+        let [start, task] = createTask({
+          operation: function* child() {
             try {
               return yield* op();
             } catch (error) {
@@ -66,6 +66,7 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
         });
         children.add(task);
         routine.next(Resume(Ok(task)));
+        start();
       },
     },
     delimit: function* spawnScope(routine, next) {
@@ -108,6 +109,7 @@ function delimitTask<T>(
         result.reject(error);
         finalized.reject(error);
       } finally {
+        //	console.log(routine.name, 'FINAL');
         finalized.resolve();
         if (state.halted) {
           result.reject(new Error("halted"));

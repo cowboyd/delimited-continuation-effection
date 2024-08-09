@@ -1,4 +1,4 @@
-import { Err, Ok, Result, unbox } from "./result.ts";
+import { Err, Ok, Result } from "./result.ts";
 import { suspend } from "./suspend.ts";
 import type { Operation, Resolve } from "./types.ts";
 
@@ -9,29 +9,33 @@ export interface WithResolvers<T> {
 }
 
 export function withResolvers<T>(): WithResolvers<T> {
-  let continuations = new Set<Resolve<void>>();
+  let continuations = new Set<Resolve<Result<T>>>();
   let result: Result<T> | undefined = undefined;
 
-  let operation: Operation<T> = {
-    *[Symbol.iterator]() {
-      if (!result) {
-        yield* suspend<void>((resolve) => {
-          continuations.add(resolve);
-          return () => {
-            continuations.delete(resolve);
-          };
-        });
+  let operation: Operation<T> = suspend<T>((resolve, reject) => {
+    let settle = (outcome: Result<T>) => {
+      if (outcome.ok) {
+        resolve(outcome.value);
+      } else {
+        reject(outcome.error);
       }
-      return unbox(result!);
-    },
-  };
+    };
+
+    if (result) {
+      settle(result);
+      return () => {};
+    } else {
+      continuations.add(settle);
+      return () => continuations.delete(settle);
+    }
+  });
 
   let settle = (outcome: Result<T>) => {
     if (!result) {
       result = outcome;
     }
     for (let continuation of continuations) {
-      continuation();
+      continuation(result);
     }
   };
 

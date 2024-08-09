@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { Control, Done, Resume } from "./control.ts";
+import { Control, Done, Resume, Suspend } from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
 import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
 
@@ -51,8 +51,6 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 }
 
 export function delimitControl<T>(): Delimiter<T, T, Control> {
-  let exitSuspendPoint = () => {};
-
   let escape: Result<void> | void = void (0);
 
   return {
@@ -94,11 +92,6 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
             }
           } else if (control.method === "break") {
             escape = control.result;
-            try {
-              exitSuspendPoint();
-            } catch (error) {
-              escape = Err(error);
-            }
             if (iterator.return) {
               let next = iterator.return();
               if (next.done) {
@@ -111,25 +104,27 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
             }
           } else if (control.method === "suspend") {
             if (control.unsuspend) {
-              let settled = false;
+              let { unsuspend } = control;
+              let settlement: Result<unknown> | void = void 0;
               let settle = (result: Result<unknown>) => {
-                if (!settled) {
-                  exitSuspendPoint();
-                  routine.next(Resume(result));
+                if (!settlement) {
+                  settlement = result;
+                  routine.next(Resume(settlement));
                 }
               };
               let resolve = (value: unknown) => settle(Ok(value));
               let reject = (error: Error) => settle(Err(error));
-              try {
-                let unsuspend = control.unsuspend(resolve, reject) ??
-                  (() => {});
-                exitSuspendPoint = () => {
-                  exitSuspendPoint = () => {};
-                  unsuspend();
-                };
-              } catch (error) {
-                routine.next(Resume(Err(error)));
-              }
+
+              routine.next(Resume(Ok({
+                *[Symbol.iterator]() {
+                  let exit = unsuspend(resolve, reject);
+                  try {
+                    return (yield Suspend()) as unknown;
+                  } finally {
+                    exit && exit();
+                  }
+                },
+              })));
             }
           }
         } catch (error) {
