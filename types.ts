@@ -14,10 +14,6 @@ export interface Coroutine<T = unknown> {
   name: string;
   handlers: Record<string, InstructionHandler>;
   instructions(): Iterator<Instruction, T, unknown>;
-  with<T>(
-    handlers: Record<string, InstructionHandler<any>>,
-    op: (routine: Coroutine) => Operation<T>,
-  ): Operation<T>;
   next<I>(instruction: Instruction<I>): void;
 }
 
