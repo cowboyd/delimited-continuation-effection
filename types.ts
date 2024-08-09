@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-explicit-any
 
 export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
