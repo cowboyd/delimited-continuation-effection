@@ -62,7 +62,6 @@ describe("spawn", () => {
     let error = new Error("moo");
     let root = run(function* () {
       child = yield* spawn(function* () {
-        yield* sleep(1);
         throw error;
       });
 
@@ -197,13 +196,8 @@ describe("spawn", () => {
     let child;
     let root = run(function* () {
       child = yield* spawn(function* () {
-        try {
-          yield* sleep(20);
-
-          return "foo";
-        } finally {
-          //	  console.log('bye')
-        }
+        yield* sleep(2);
+        return "foo";
       });
 
       return 1;

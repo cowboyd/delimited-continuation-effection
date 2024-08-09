@@ -229,7 +229,6 @@ describe("run()", () => {
     let didRun = false;
     let task = run(function* Main() {
       yield* spawn(function* willBoom() {
-        yield* sleep(5);
         throw new Error("boom");
       });
       try {
@@ -269,7 +268,6 @@ describe("run()", () => {
   it("can throw error when child blows up", async () => {
     let task = run(function* Main() {
       yield* spawn(function* Boomer() {
-        yield* sleep(5);
         throw new Error("boom");
       });
       try {
