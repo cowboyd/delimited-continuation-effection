@@ -14,6 +14,7 @@ export interface Coroutine<T = unknown> {
   name: string;
   handlers: Record<string, InstructionHandler>;
   instructions(): Iterator<Instruction, T, unknown>;
+  reduce(routine: Coroutine, instruction: Instruction): void;
   next<I>(instruction: Instruction<I>): void;
 }
 

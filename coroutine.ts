@@ -6,14 +6,14 @@ import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
 export interface CoroutineOptions<T> {
   name?: string;
   operation(routine: Coroutine): Operation<T>;
-  reducer?: Reducer;
+  reduce?(routine: Coroutine, instruction: Instruction): void;
   delimiters: Delimiter<T, T, any>[];
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
   let {
     operation,
-    reducer = new Reducer(),
+    reduce = new Reducer().reduce,
     name = options.operation.name,
     delimiters,
   } = options;
@@ -37,25 +37,14 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
   let routine: Coroutine<T> = {
     name,
     handlers,
+    reduce,
     instructions() {
       if (!iterator) {
         iterator = delimit(routine, operation)[Symbol.iterator]();
       }
       return iterator;
     },
-    *with(newHandlers, op) {
-      let originalHandlers = routine.handlers;
-      try {
-        routine.handlers = Object.assign(
-          Object.create(originalHandlers),
-          newHandlers,
-        );
-        return yield* op(routine);
-      } finally {
-        routine.handlers = originalHandlers;
-      }
-    },
-    next: (instruction) => reducer.reduce(routine, instruction),
+    next: (instruction) => reduce(routine, instruction),
   };
 
   return routine;
@@ -155,7 +144,7 @@ class Reducer {
   reducing = false;
   readonly queue: [Coroutine, Instruction][] = [];
 
-  reduce(routine: Coroutine, instruction: Instruction) {
+  reduce = (routine: Coroutine, instruction: Instruction) => {
     let { queue } = this;
     queue.unshift([routine, instruction]);
     if (this.reducing) return;
@@ -180,5 +169,5 @@ class Reducer {
     } finally {
       this.reducing = false;
     }
-  }
+  };
 }

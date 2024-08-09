@@ -5,7 +5,13 @@ import { Err, Ok } from "./result.ts";
 import { Delimiter, Instruction } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
-export function createTask<T>(operation: () => Operation<T>): Task<T> {
+export interface TaskOptions<T> {
+  operation(): Operation<T>;
+  reduce?(routine: Coroutine, instruction: Instruction): void;
+}
+
+export function createTask<T>(options: TaskOptions<T>): Task<T> {
+  let { operation, reduce } = options;
   let result = createFutureWithResolvers<T>();
   let finalized = createFutureWithResolvers<void>();
 
@@ -15,7 +21,7 @@ export function createTask<T>(operation: () => Operation<T>): Task<T> {
     delimitSpawn(),
   ];
 
-  let routine = createCoroutine({ operation, delimiters });
+  let routine = createCoroutine({ operation, reduce, delimiters });
 
   routine.next(Resume(Ok()));
 
@@ -43,17 +49,20 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
         routine: Coroutine,
         op: () => Operation<T>,
       ) {
-        let task = createTask(function* () {
-          try {
-            return yield* op();
-          } catch (error) {
-            routine.next(Break(Err(error)));
-            throw error;
-          } finally {
-            if (typeof task !== "undefined") {
-              children.delete(task);
+        let task = createTask({
+          operation: function* () {
+            try {
+              return yield* op();
+            } catch (error) {
+              routine.next(Break(Err(error)));
+              throw error;
+            } finally {
+              if (typeof task !== "undefined") {
+                children.delete(task);
+              }
             }
-          }
+          },
+          reduce: routine.reduce,
         });
         children.add(task);
         routine.next(Resume(Ok(task)));

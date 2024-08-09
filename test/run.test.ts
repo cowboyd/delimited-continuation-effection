@@ -267,7 +267,7 @@ describe("run()", () => {
     await expect(task.halt()).rejects.toEqual(error);
   });
 
-  it.skip("can throw error when child blows up", async () => {
+  it("can throw error when child blows up", async () => {
     let task = run(function* Main() {
       yield* spawn(function* Boomer() {
         yield* sleep(5);
