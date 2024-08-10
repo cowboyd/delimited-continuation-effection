@@ -183,7 +183,7 @@ describe("spawn", () => {
   //           yield* sleep(1);
   //           throw error;
   //         });
-  //         yield* sleep(5000);
+  //         yield* suspend();
   //       });
   //     } catch (err) {
   //       return err;
