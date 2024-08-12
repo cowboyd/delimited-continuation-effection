@@ -6,7 +6,6 @@ import {
   Popmark,
   Pushmark,
   Resume,
-  Self,
   Suspend,
 } from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
@@ -170,10 +169,6 @@ function controlHandlers() {
       }
     },
   };
-}
-
-export function* useCoroutine(): Operation<Coroutine<unknown>> {
-  return (yield Self()) as Coroutine<unknown>;
 }
 
 class Reducer {
