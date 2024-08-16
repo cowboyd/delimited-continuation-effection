@@ -111,7 +111,6 @@ function delimitTask<T>(
         result.reject(error);
         finalized.reject(error);
       } finally {
-        //	console.log(routine.name, 'FINAL');
         finalized.resolve();
         if (state.halted) {
           result.reject(new Error("halted"));

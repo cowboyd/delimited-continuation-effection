@@ -10,6 +10,7 @@ export interface Task<T> extends Future<T> {
 
 export interface Coroutine<T = unknown> {
   name: string;
+  context: Record<string, unknown>;
   handlers: Record<string, InstructionHandler>;
   instructions(): Iterator<Instruction, T, unknown>;
   reduce(routine: Coroutine, instruction: Instruction): void;

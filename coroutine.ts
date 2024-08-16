@@ -44,6 +44,7 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 
   let routine: Coroutine<T> = {
     name,
+    context: Object.create(null),
     handlers,
     reduce,
     instructions() {
@@ -56,6 +57,10 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
   };
 
   return routine;
+}
+
+export function* useCoroutine(): Operation<Coroutine> {
+  return (yield { handler: "@effection/self", data: {} }) as Coroutine;
 }
 
 export function delimitControl<T>(): Delimiter<T, T, Control> {
@@ -77,6 +82,9 @@ function controlHandlers() {
   let marks: Result<void>[] = [];
 
   return {
+    ["@effection/self"](routine: Coroutine) {
+      routine.next(Resume(Ok(routine)));
+    },
     ["@effection/coroutine"](routine: Coroutine, control: Control) {
       try {
         const iterator = routine.instructions();
