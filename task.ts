@@ -25,7 +25,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
     delimitTask(state, result, finalized),
     delimitControl(),
     delimitSpawn(),
-  ];
+  ] as Delimiter<T>[];
 
   let routine = createCoroutine({ operation, reduce, handlers, delimiters });
 
@@ -88,9 +88,8 @@ function taskHandlers(state: { halted: boolean }){
   } as Record<string, InstructionHandler>;
 }
 
-function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
-  return {
-    delimit: function* spawnScope(routine, next) {
+function delimitSpawn<T>(): Delimiter<T> {
+  return function* spawnScope(routine, next) {
       let children = yield* Children.set(new Set());
       try {
         return yield* next(routine);
@@ -111,7 +110,6 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
           throw teardown.error;
         }
       }
-    },
   };
 }
 
@@ -119,11 +117,8 @@ function delimitTask<T>(
   state: { halted: boolean },
   result: FutureWithResolvers<T>,
   finalized: FutureWithResolvers<void>,
-): Delimiter<T, void, () => Operation<unknown>> {
-
-
-  return {
-    delimit: function* task(routine, resume) {
+): Delimiter<T, void> {
+  return function* task(routine, resume) {
       try {
         let value = yield* resume(routine);
 
@@ -139,15 +134,6 @@ function delimitTask<T>(
           result.reject(new Error("halted"));
         }
       }
-    },
-    handlers: {
-      ["@effection/task.halt"](routine: Coroutine) {
-        if (!state.halted) {
-          state.halted = true;
-          routine.next(Break(Ok()));
-        }
-      },
-    },
   };
 }
 

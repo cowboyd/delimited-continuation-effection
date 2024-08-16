@@ -25,12 +25,8 @@ export interface Context<T> {
   expect(): Operation<T>;
 }
 
-export interface Delimiter<T, TReturn = T, TData = unknown> {
-  handlers?: Record<string, InstructionHandler<TData>>;
-  delimit(
-    routine: Coroutine,
-    next: (routine: Coroutine) => Operation<T>,
-  ): Operation<TReturn>;
+export interface Delimiter<T, TReturn = T> {
+  (routine: Coroutine, next: (routine: Coroutine) => Operation<T>): Operation<TReturn>;
 }
 
 export interface Instruction<TData = unknown> {

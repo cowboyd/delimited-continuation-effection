@@ -16,7 +16,7 @@ export interface CoroutineOptions<T> {
   operation(routine: Coroutine): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
   handlers?: {[name: string]: InstructionHandler};
-  delimiters: Delimiter<T, T, any>[];
+  delimiters: Delimiter<T, T>[];
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
@@ -30,10 +30,10 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 
   let iterator: Iterator<Instruction, T, unknown> | undefined;
 
-  let delimit = options.delimiters.reduceRight(
+  let delimit = delimiters.reduceRight(
     (delimit, current) => {
       return (routine, next) =>
-        current.delimit(routine, (routine) => delimit(routine, next));
+        current(routine, (routine) => delimit(routine, next));
     },
     (routine: Coroutine, next: (routine: Coroutine) => Operation<T>) =>
       next(routine),
@@ -42,7 +42,7 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
   let routine: Coroutine<T> = {
     name,
     context: Object.create(null),
-    handlers: Object.assign(controlHandlers(), handlers, ...delimiters.map((d => d.handlers))),
+    handlers: Object.assign(controlHandlers(), handlers),
     reduce,
     instructions() {
       if (!iterator) {
@@ -60,9 +60,8 @@ export function* useCoroutine(): Operation<Coroutine> {
   return (yield { handler: "@effection/self", data: {} }) as Coroutine;
 }
 
-export function delimitControl<T>(): Delimiter<T, T, Control> {
-  return {
-    delimit: function* control(routine, next) {
+export function delimitControl<T>(): Delimiter<T> {
+  return function* control(routine, next) {
       try {
         yield Pushmark();
         return yield* next(routine);
@@ -71,7 +70,6 @@ export function delimitControl<T>(): Delimiter<T, T, Control> {
       } finally {
         yield Popmark();
       }
-    },
   };
 }
 
