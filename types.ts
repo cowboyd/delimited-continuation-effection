@@ -17,6 +17,14 @@ export interface Coroutine<T = unknown> {
   next<I>(instruction: Instruction<I>): void;
 }
 
+export interface Context<T> {
+  name: string;
+  defaultValue?: T;
+  get(): Operation<T | undefined>;
+  set(value: T): Operation<T>;
+  expect(): Operation<T>;
+}
+
 export interface Delimiter<T, TReturn = T, TData = unknown> {
   handlers?: Record<string, InstructionHandler<TData>>;
   delimit(

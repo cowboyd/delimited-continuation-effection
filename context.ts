@@ -1,23 +1,17 @@
-import { Operation } from "./types.ts";
+import { Context, Operation } from "./types.ts";
 import { useCoroutine } from "./coroutine.ts";
-
-export interface Context<T> {
-  name: string;
-  get(): Operation<T | undefined>;
-  set(value: T): Operation<T>;
-  expect(): Operation<T>;
-}
+import { getContext, setContext } from "./-context.ts";
 
 export function createContext<T>(name: string, defaultValue?: T): Context<T> {
 
+  let context: Context<T> = { name, get, set, expect, defaultValue };
+  
   function* get(): Operation<T | undefined> {
-    let routine = yield* useCoroutine();
-    return (routine.context[name] ?? defaultValue) as T | undefined;
+    return getContext(context, yield* useCoroutine());
   }
 
   function* set(value: T): Operation<T> {
-    let routine = yield* useCoroutine();
-    return routine.context[name] = value;
+    return setContext(context, yield* useCoroutine(), value);
   }
 
   function* expect(): Operation<T> {
@@ -30,5 +24,5 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
     return value;
   }
   
-  return { name, get, set, expect };
+  return context;
 }

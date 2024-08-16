@@ -1,8 +1,10 @@
+import { getContext } from "./-context.ts";
+import { createContext } from "./context.ts";
 import { Break, Resume } from "./control.ts";
 import { createCoroutine, delimitControl } from "./coroutine.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Delimiter, Instruction } from "./types.ts";
+import { Delimiter, Instruction, InstructionHandler } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
@@ -15,13 +17,17 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   let result = createFutureWithResolvers<T>();
   let finalized = createFutureWithResolvers<void>();
 
+  let state = { halted: false };
+  
+  let handlers = taskHandlers(state);
+  
   let delimiters = [
-    delimitTask(result, finalized),
+    delimitTask(state, result, finalized),
     delimitControl(),
     delimitSpawn(),
   ];
 
-  let routine = createCoroutine({ operation, reduce, delimiters });
+  let routine = createCoroutine({ operation, reduce, handlers, delimiters });
 
   let halted: Future<void> | undefined = void 0;
 
@@ -41,14 +47,19 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   return [() => routine.next(Resume(Ok())), task];
 }
 
-function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
-  let children = new Set<Task<unknown>>();
+const Children = createContext<Set<Task<unknown>>>('@effection/task.children');
+
+function taskHandlers(state: { halted: boolean }){
   return {
-    handlers: {
       ["@effection/task.spawn"]<T>(
         routine: Coroutine,
         op: () => Operation<T>,
       ) {
+	let children = getContext(Children, routine);
+	if (!children) {
+	  routine.next(Resume(Err(new Error(`no children found!!`))));
+	  return;
+	}
         let [start, task] = createTask({
           operation: function* child() {
             try {
@@ -68,8 +79,19 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
         routine.next(Resume(Ok(task)));
         start();
       },
-    },
+    ["@effection/task.halt"](routine: Coroutine) {
+        if (!state.halted) {
+          state.halted = true;
+          routine.next(Break(Ok()));
+        }
+      }
+  } as Record<string, InstructionHandler>;
+}
+
+function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
+  return {
     delimit: function* spawnScope(routine, next) {
+      let children = yield* Children.set(new Set());
       try {
         return yield* next(routine);
       } finally {
@@ -94,10 +116,11 @@ function delimitSpawn<T>(): Delimiter<T, T, () => Operation<unknown>> {
 }
 
 function delimitTask<T>(
+  state: { halted: boolean },
   result: FutureWithResolvers<T>,
   finalized: FutureWithResolvers<void>,
 ): Delimiter<T, void, () => Operation<unknown>> {
-  let state = { halted: false };
+
 
   return {
     delimit: function* task(routine, resume) {

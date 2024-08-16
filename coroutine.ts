@@ -9,12 +9,13 @@ import {
   Suspend,
 } from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
-import type { Coroutine, Delimiter, Instruction, Operation } from "./types.ts";
+import type { Coroutine, Delimiter, Instruction, InstructionHandler, Operation } from "./types.ts";
 
 export interface CoroutineOptions<T> {
   name?: string;
   operation(routine: Coroutine): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
+  handlers?: {[name: string]: InstructionHandler};
   delimiters: Delimiter<T, T, any>[];
 }
 
@@ -23,15 +24,11 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     operation,
     reduce = new Reducer().reduce,
     name = options.operation.name,
+    handlers,
     delimiters,
   } = options;
 
   let iterator: Iterator<Instruction, T, unknown> | undefined;
-
-  let handlers = Object.assign(
-    controlHandlers(),
-    ...delimiters.map((d) => d.handlers),
-  );
 
   let delimit = options.delimiters.reduceRight(
     (delimit, current) => {
@@ -45,7 +42,7 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
   let routine: Coroutine<T> = {
     name,
     context: Object.create(null),
-    handlers,
+    handlers: Object.assign(controlHandlers(), handlers, ...delimiters.map((d => d.handlers))),
     reduce,
     instructions() {
       if (!iterator) {
