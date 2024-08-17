@@ -8,14 +8,20 @@ import {
   Suspend,
 } from "./control.ts";
 import { Err, Ok, Result } from "./result.ts";
-import type { Coroutine, Delimiter, Instruction, InstructionHandler, Operation } from "./types.ts";
+import type {
+  Coroutine,
+  Delimiter,
+  Instruction,
+  InstructionHandler,
+  Operation,
+} from "./types.ts";
 
 export interface CoroutineOptions<T> {
   name?: string;
   operation(routine: Coroutine): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
   context?: Record<string, unknown>;
-  handlers?: {[name: string]: InstructionHandler};
+  handlers?: { [name: string]: InstructionHandler };
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
@@ -50,16 +56,16 @@ export function* useCoroutine(): Operation<Coroutine> {
   return (yield { handler: "@effection/self", data: {} }) as Coroutine;
 }
 
-export function delimitControl<T>(): Delimiter<T, T> {
+export function controlScope<T>(): Delimiter<T, T> {
   return function* control(routine, next) {
-      try {
-        yield Pushmark();
-        return yield* next(routine);
-      } catch (error) {
-        throw yield Errormark(error);
-      } finally {
-        yield Popmark();
-      }
+    try {
+      yield Pushmark();
+      return yield* next(routine);
+    } catch (error) {
+      throw yield Errormark(error);
+    } finally {
+      yield Popmark();
+    }
   };
 }
 

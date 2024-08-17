@@ -3,9 +3,8 @@ import { useCoroutine } from "./coroutine.ts";
 import { getContext, setContext } from "./-context.ts";
 
 export function createContext<T>(name: string, defaultValue?: T): Context<T> {
-
   let context: Context<T> = { name, get, set, expect, defaultValue };
-  
+
   function* get(): Operation<T | undefined> {
     return getContext(context, yield* useCoroutine());
   }
@@ -23,11 +22,11 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
     }
     return value;
   }
-  
+
   return context;
 }
 
-export function contextScope<T>(): Delimiter<T> {
+export function contextScope<T>(): Delimiter<T, T> {
   return function* context(routine, next) {
     let original = routine.context;
     routine.context = Object.create(original);

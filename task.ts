@@ -1,7 +1,7 @@
 import { getContext } from "./-context.ts";
 import { createContext } from "./context.ts";
 import { Break, Resume } from "./control.ts";
-import { createCoroutine, delimitControl } from "./coroutine.ts";
+import { createCoroutine, controlScope } from "./coroutine.ts";
 import { compose } from "./delimiter.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
@@ -20,15 +20,14 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   let finalized = createFutureWithResolvers<void>();
 
   let state = { halted: false };
-  
+
   let handlers = taskHandlers(state);
-  
+
   let delimit = compose([
     delimitTask(state, result, finalized),
-    delimitControl(),
-    delimitSpawn(),
+    controlScope(),
+    spawnScope(),
   ]);
-
 
   let operation = (routine: Coroutine) => delimit(routine, options.operation);
 
@@ -52,70 +51,70 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   return [() => routine.next(Resume(Ok())), task];
 }
 
-const Children = createContext<Set<Task<unknown>>>('@effection/task.children');
+const Children = createContext<Set<Task<unknown>>>("@effection/task.children");
 
-function taskHandlers(state: { halted: boolean }){
+function taskHandlers(state: { halted: boolean }) {
   return {
-      ["@effection/task.spawn"]<T>(
-        routine: Coroutine,
-        op: () => Operation<T>,
-      ) {
-	let children = getContext(Children, routine);
-	if (!children) {
-	  routine.next(Resume(Err(new Error(`no children found!!`))));
-	  return;
-	}
-        let [start, task] = createTask({
-	  context: routine.context,
-          operation: function* child() {
-            try {
-              return yield* op();
-            } catch (error) {
-              routine.next(Break(Err(error)));
-              throw error;
-            } finally {
-              if (typeof task !== "undefined") {
-                children.delete(task);
-              }
-            }
-          },
-          reduce: routine.reduce,
-        });
-        children.add(task);
-        routine.next(Resume(Ok(task)));
-        start();
-      },
-    ["@effection/task.halt"](routine: Coroutine) {
-        if (!state.halted) {
-          state.halted = true;
-          routine.next(Break(Ok()));
-        }
+    ["@effection/task.spawn"]<T>(
+      routine: Coroutine,
+      op: () => Operation<T>,
+    ) {
+      let children = getContext(Children, routine);
+      if (!children) {
+        routine.next(Resume(Err(new Error(`no children found!!`))));
+        return;
       }
+      let [start, task] = createTask({
+        context: routine.context,
+        operation: function* child() {
+          try {
+            return yield* op();
+          } catch (error) {
+            routine.next(Break(Err(error)));
+            throw error;
+          } finally {
+            if (typeof task !== "undefined") {
+              children.delete(task);
+            }
+          }
+        },
+        reduce: routine.reduce,
+      });
+      children.add(task);
+      routine.next(Resume(Ok(task)));
+      start();
+    },
+    ["@effection/task.halt"](routine: Coroutine) {
+      if (!state.halted) {
+        state.halted = true;
+        routine.next(Break(Ok()));
+      }
+    },
   } as Record<string, InstructionHandler>;
 }
 
-function delimitSpawn<T>(): Delimiter<T, T> {
+export function spawnScope<T>(): Delimiter<T, T> {
   return function* spawnScope(routine, next) {
-      let children = yield* Children.set(new Set());
-      try {
-        return yield* next(routine);
-      } finally {
-        let teardown = Ok();
-        while (children.size > 0) {
-          for (let child of [...children].reverse()) {
-            try {
-              yield* child.halt();
-            } catch (error) {
-              teardown = Err(error);
-            } finally {
-              children.delete(child);
-            }
+    let children = yield* Children.set(new Set());
+    try {
+      return yield* next(routine);
+    } finally {
+      let teardown = Ok();
+      while (children.size > 0) {
+        for (let child of [...children].reverse()) {
+          try {
+            yield* child.halt();
+          } catch (error) {
+            teardown = Err(error);
+          } finally {
+            children.delete(child);
           }
         }
-        if (!teardown.ok) {
-          throw teardown.error;
-        }
       }
+      if (!teardown.ok) {
+        throw teardown.error;
+      }
+    }
   };
 }
 
@@ -125,21 +124,21 @@ function delimitTask<T>(
   finalized: FutureWithResolvers<void>,
 ): Delimiter<T, void> {
   return function* task(routine, resume) {
-      try {
-        let value = yield* resume(routine);
+    try {
+      let value = yield* resume(routine);
 
-        if (!state.halted) {
-          result.resolve(value);
-        }
-      } catch (error) {
-        result.reject(error);
-        finalized.reject(error);
-      } finally {
-        finalized.resolve();
-        if (state.halted) {
-          result.reject(new Error("halted"));
-        }
+      if (!state.halted) {
+        result.resolve(value);
       }
+    } catch (error) {
+      result.reject(error);
+      finalized.reject(error);
+    } finally {
+      finalized.resolve();
+      if (state.halted) {
+        result.reject(new Error("halted"));
+      }
+    }
   };
 }
 

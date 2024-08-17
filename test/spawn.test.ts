@@ -1,5 +1,6 @@
 import { describe, expect, it } from "./suite.ts";
 import { run, sleep, spawn, suspend } from "../mod.ts";
+import { scoped } from "../scoped.ts";
 
 describe("spawn", () => {
   it("can spawn a new child task", async () => {
@@ -173,24 +174,6 @@ describe("spawn", () => {
       "first done",
     ]);
   });
-
-  // it.skip("can catch an error spawned inside of an action", async () => {
-  //   let error = new Error("boom!");
-  //   let value = await run(function* main() {
-  //     try {
-  //       yield* scoped(function* () {
-  //         yield* spawn(function* TheBomb() {
-  //           yield* sleep(1);
-  //           throw error;
-  //         });
-  //         yield* suspend();
-  //       });
-  //     } catch (err) {
-  //       return err;
-  //     }
-  //   });
-  //   expect(value).toBe(error);
-  // });
 
   it("halts children on explicit halt", async () => {
     let child;

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "./suite.ts";
 
-import { contextScope, delimit, createContext, run, sleep, spawn } from "../mod.ts";
+import {
+  contextScope,
+  createContext,
+  delimit,
+  run,
+  sleep,
+  spawn,
+} from "../mod.ts";
 
 const numbers = createContext("number", 3);
 
@@ -41,28 +48,27 @@ describe("context", () => {
   });
 
   it("inherits values from parent tasks", async () => {
-    let context = createContext<string>('just-a-string');
-    await run(function*() {
+    let context = createContext<string>("just-a-string");
+    await run(function* () {
       yield* context.set("hello");
 
-      let task = yield* spawn(function*() {
-	return yield* context.get();
+      let task = yield* spawn(function* () {
+        return yield* context.get();
       });
 
       expect(yield* task).toEqual("hello");
-    })
+    });
   });
 
   it("does see values that are set by child tasks", async () => {
-    let context = createContext<string>('just-a-string');
-    await run(function*() {
+    let context = createContext<string>("just-a-string");
+    await run(function* () {
       yield* context.set("hello");
-      yield* spawn(function*() {
-	yield* context.set("goodbye");
+      yield* spawn(function* () {
+        yield* context.set("goodbye");
       });
       yield* sleep(1);
       expect(yield* context.get()).toEqual("hello");
     });
-    
-  })
+  });
 });

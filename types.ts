@@ -26,7 +26,10 @@ export interface Context<T> {
 }
 
 export interface Delimiter<T, TReturn = T> {
-  (routine: Coroutine, next: (routine: Coroutine) => Operation<T>): Operation<TReturn>;
+  (
+    routine: Coroutine,
+    next: (routine: Coroutine) => Operation<T>,
+  ): Operation<TReturn>;
 }
 
 export interface Instruction<TData = unknown> {
