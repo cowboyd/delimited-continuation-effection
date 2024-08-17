@@ -20,23 +20,23 @@ describe("scoped()", () => {
     });
     expect(value).toBe(error);
   });
-  
+
   it("does not let tasks escape", async () => {
     await run(function* main() {
       let halted = false;
 
-      yield* scoped(function*() {
-	yield* spawn(function*() {
-	  try {
-	    yield* suspend();
-	  } finally {
-	    halted = true;
-	  }
-	});
-	yield* sleep(0);
+      yield* scoped(function* () {
+        yield* spawn(function* () {
+          try {
+            yield* suspend();
+          } finally {
+            halted = true;
+          }
+        });
+        yield* sleep(0);
       });
 
       expect(halted).toBe(true);
-    })
+    });
   });
 });

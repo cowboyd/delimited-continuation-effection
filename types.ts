@@ -8,6 +8,10 @@ export interface Task<T> extends Future<T> {
   halt(): Future<void>;
 }
 
+export type Yielded<T extends Operation<unknown>> = T extends
+  Operation<infer TYield> ? TYield
+  : never;
+
 export interface Coroutine<T = unknown> {
   name: string;
   context: Record<string, unknown>;

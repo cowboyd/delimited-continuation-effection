@@ -1,7 +1,7 @@
 import { getContext } from "./-context.ts";
 import { createContext } from "./context.ts";
 import { Break, Resume } from "./control.ts";
-import { createCoroutine, controlScope } from "./coroutine.ts";
+import { controlScope, createCoroutine } from "./coroutine.ts";
 import { compose } from "./delimiter.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
