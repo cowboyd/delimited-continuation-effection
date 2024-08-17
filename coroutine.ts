@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-explicit-any
 import {
   Control,
   Done,
@@ -15,8 +14,8 @@ export interface CoroutineOptions<T> {
   name?: string;
   operation(routine: Coroutine): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
+  context?: Record<string, unknown>;
   handlers?: {[name: string]: InstructionHandler};
-  delimiters: Delimiter<T, T>[];
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
@@ -24,29 +23,20 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     operation,
     reduce = new Reducer().reduce,
     name = options.operation.name,
+    context,
     handlers,
-    delimiters,
   } = options;
 
   let iterator: Iterator<Instruction, T, unknown> | undefined;
 
-  let delimit = delimiters.reduceRight(
-    (delimit, current) => {
-      return (routine, next) =>
-        current(routine, (routine) => delimit(routine, next));
-    },
-    (routine: Coroutine, next: (routine: Coroutine) => Operation<T>) =>
-      next(routine),
-  );
-
   let routine: Coroutine<T> = {
     name,
-    context: Object.create(null),
+    context: Object.create(context ?? null),
     handlers: Object.assign(controlHandlers(), handlers),
     reduce,
     instructions() {
       if (!iterator) {
-        iterator = delimit(routine, operation)[Symbol.iterator]();
+        iterator = operation(routine)[Symbol.iterator]();
       }
       return iterator;
     },

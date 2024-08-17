@@ -1,4 +1,4 @@
-import { Context, Operation } from "./types.ts";
+import { Context, Delimiter, Operation } from "./types.ts";
 import { useCoroutine } from "./coroutine.ts";
 import { getContext, setContext } from "./-context.ts";
 
@@ -25,4 +25,16 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   }
   
   return context;
+}
+
+export function contextScope<T>(): Delimiter<T> {
+  return function* context(routine, next) {
+    let original = routine.context;
+    routine.context = Object.create(original);
+    try {
+      return yield* next(routine);
+    } finally {
+      routine.context = original;
+    }
+  };
 }

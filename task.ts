@@ -2,6 +2,7 @@ import { getContext } from "./-context.ts";
 import { createContext } from "./context.ts";
 import { Break, Resume } from "./control.ts";
 import { createCoroutine, delimitControl } from "./coroutine.ts";
+import { compose } from "./delimiter.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
 import { Delimiter, Instruction, InstructionHandler } from "./types.ts";
@@ -10,10 +11,11 @@ import { Coroutine, Future, Operation, Task } from "./types.ts";
 export interface TaskOptions<T> {
   operation(): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
+  context?: Record<string, unknown>;
 }
 
 export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
-  let { operation, reduce } = options;
+  let { reduce, context, operation: { name } } = options;
   let result = createFutureWithResolvers<T>();
   let finalized = createFutureWithResolvers<void>();
 
@@ -21,13 +23,17 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   
   let handlers = taskHandlers(state);
   
-  let delimiters = [
+  let delimit = compose([
+    //@ts-expect-error it is ok
     delimitTask(state, result, finalized),
     delimitControl(),
     delimitSpawn(),
-  ] as Delimiter<T>[];
+  ]);
 
-  let routine = createCoroutine({ operation, reduce, handlers, delimiters });
+
+  let operation = (routine: Coroutine) => delimit(routine, options.operation);
+
+  let routine = createCoroutine({ name, operation, reduce, context, handlers });
 
   let halted: Future<void> | undefined = void 0;
 
@@ -61,6 +67,7 @@ function taskHandlers(state: { halted: boolean }){
 	  return;
 	}
         let [start, task] = createTask({
+	  context: routine.context,
           operation: function* child() {
             try {
               return yield* op();
