@@ -50,7 +50,7 @@ export function* useCoroutine(): Operation<Coroutine> {
   return (yield { handler: "@effection/self", data: {} }) as Coroutine;
 }
 
-export function delimitControl<T>(): Delimiter<T> {
+export function delimitControl<T>(): Delimiter<T, T> {
   return function* control(routine, next) {
       try {
         yield Pushmark();

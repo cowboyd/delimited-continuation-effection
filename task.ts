@@ -24,7 +24,6 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   let handlers = taskHandlers(state);
   
   let delimit = compose([
-    //@ts-expect-error it is ok
     delimitTask(state, result, finalized),
     delimitControl(),
     delimitSpawn(),
@@ -95,7 +94,7 @@ function taskHandlers(state: { halted: boolean }){
   } as Record<string, InstructionHandler>;
 }
 
-function delimitSpawn<T>(): Delimiter<T> {
+function delimitSpawn<T>(): Delimiter<T, T> {
   return function* spawnScope(routine, next) {
       let children = yield* Children.set(new Set());
       try {
