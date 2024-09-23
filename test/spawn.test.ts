@@ -1,6 +1,5 @@
 import { describe, expect, it } from "./suite.ts";
 import { run, sleep, spawn, suspend } from "../mod.ts";
-import { scoped } from "../scoped.ts";
 
 describe("spawn", () => {
   it("can spawn a new child task", async () => {

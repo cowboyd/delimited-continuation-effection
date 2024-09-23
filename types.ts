@@ -1,3 +1,5 @@
+import type { Result } from "./result.ts";
+
 export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
 }
@@ -8,6 +10,14 @@ export interface Task<T> extends Future<T> {
   halt(): Future<void>;
 }
 
+export interface Scope {
+  // readonly context: Record<string, unknown>;
+  get<T>(context: Context<T>): T;
+  set<T>(context: Context<T>, value: T): T;
+  // spawn<T>(operation: () => Operation<T>): Operation<Task<T>>;
+  // eval<T>(operation: Operation<T>): Operation<T>;
+}
+
 export type Yielded<T extends Operation<unknown>> = T extends
   Operation<infer TYield> ? TYield
   : never;
@@ -15,6 +25,11 @@ export type Yielded<T extends Operation<unknown>> = T extends
 export interface Coroutine<T = unknown> {
   name: string;
   context: Record<string, unknown>;
+  stack: {
+    pushDelimiter(): void;
+    popDelimiter(): Result<unknown>;
+    setDelimiterExitResult(result: Result<unknown>): Result<unknown>;
+  };
   handlers: Record<string, InstructionHandler>;
   instructions(): Iterator<Instruction, T, unknown>;
   reduce(routine: Coroutine, instruction: Instruction): void;

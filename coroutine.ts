@@ -7,6 +7,7 @@ import {
   Resume,
   Suspend,
 } from "./control.ts";
+import { DelimitedStack } from "./delimited-stack.ts";
 import { Reducer } from "./reducer.ts";
 import { Err, Ok, Result } from "./result.ts";
 import type {
@@ -38,6 +39,7 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 
   let routine: Coroutine<T> = {
     name,
+    stack: new DelimitedStack(),
     context: Object.create(context ?? null),
     handlers: Object.assign(controlHandlers(), handlers),
     reduce,
@@ -71,8 +73,6 @@ export function controlScope<T>(): Delimiter<T, T> {
 }
 
 function controlHandlers() {
-  let marks: Result<void>[] = [];
-
   return {
     ["@effection/self"](routine: Coroutine) {
       routine.next(Resume(Ok(routine)));
@@ -100,23 +100,17 @@ function controlHandlers() {
             throw result.error;
           }
         } else if (control.method === "break") {
-          let mark = marks.pop();
-          if (mark) {
-            marks.push(control.result);
-            if (iterator.return) {
-              let next = iterator.return();
-              if (next.done) {
-                routine.next(Done(Ok(next.value)));
-              } else {
-                routine.next(next.value);
-              }
+          routine.stack.setDelimiterExitResult(control.result);
+
+          if (iterator.return) {
+            let next = iterator.return();
+            if (next.done) {
+              routine.next(Done(Ok(next.value)));
             } else {
-              routine.next(Done(Ok()));
+              routine.next(next.value);
             }
           } else {
-            routine.next(
-              Resume(Err(new Error(`cannot break without an active mark`))),
-            );
+            routine.next(Done(Ok()));
           }
         } else if (control.method === "suspend") {
           if (control.unsuspend) {
@@ -141,28 +135,14 @@ function controlHandlers() {
             })())));
           }
         } else if (control.method === "pushmark") {
-          marks.push(Ok());
+          routine.stack.pushDelimiter();
           routine.next(Resume(Ok()));
         } else if (control.method === "popmark") {
-          let mark = marks.pop() ?? Ok();
-          routine.next(Resume(mark));
+          let result = routine.stack.popDelimiter();
+          routine.next(Resume(result));
         } else if (control.method === "errormark") {
-          let mark = marks.pop();
-          if (mark) {
-            mark = Err(control.error);
-            marks.push(mark);
-            routine.next(Resume(mark));
-          } else {
-            routine.next(
-              Resume(
-                Err(
-                  new Error(
-                    `no active mark to set error`,
-                  ),
-                ),
-              ),
-            );
-          }
+          let result = routine.stack.setDelimiterExitResult(Err(control.error));
+          routine.next(Resume(result));
         }
       } catch (error) {
         routine.next(Done(Err(error)));
