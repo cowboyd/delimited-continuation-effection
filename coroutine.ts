@@ -1,11 +1,9 @@
 import {
   Control,
   Done,
-  Errormark,
-  Popmark,
-  Pushmark,
   Resume,
   Suspend,
+  Do,
 } from "./control.ts";
 import { DelimitedStack } from "./delimited-stack.ts";
 import { Reducer } from "./reducer.ts";
@@ -55,19 +53,19 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
   return routine;
 }
 
-export function* useCoroutine(): Operation<Coroutine> {
-  return (yield { handler: "@effection/self", data: {} }) as Coroutine;
+export function* useCoroutine(): Operation<Coroutine> {  
+  return (yield Do((routine) => Ok(routine))) as Coroutine;
 }
 
 export function controlScope<T>(): Delimiter<T, T> {
   return function* control(routine, next) {
     try {
-      yield Pushmark();
+      yield Do(({ stack }) => Ok(stack.pushDelimiter()));
       return yield* next(routine);
     } catch (error) {
-      throw yield Errormark(error);
+      throw yield Do(({stack}) => stack.setDelimiterExitResult((Err(error))));
     } finally {
-      yield Popmark();
+      yield Do(({ stack }) => stack.popDelimiter());
     }
   };
 }
@@ -134,16 +132,10 @@ function controlHandlers() {
               }
             })())));
           }
-        } else if (control.method === "pushmark") {
-          routine.stack.pushDelimiter();
-          routine.next(Resume(Ok()));
-        } else if (control.method === "popmark") {
-          let result = routine.stack.popDelimiter();
-          routine.next(Resume(result));
-        } else if (control.method === "errormark") {
-          let result = routine.stack.setDelimiterExitResult(Err(control.error));
-          routine.next(Resume(result));
-        }
+        } else if (control.method === "do") {
+	  let result = control.fn(routine);
+	  routine.next(Resume(result));
+	}
       } catch (error) {
         routine.next(Done(Err(error)));
       }

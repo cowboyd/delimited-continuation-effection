@@ -1,16 +1,17 @@
 import { Context, Delimiter, Operation } from "./types.ts";
-import { useCoroutine } from "./coroutine.ts";
+import { Do } from "./control.ts";
+import { Ok } from "./result.ts";
 import { getContext, setContext } from "./-context.ts";
 
 export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   let context: Context<T> = { name, get, set, expect, defaultValue };
 
-  function* get(): Operation<T | undefined> {
-    return getContext(context, yield* useCoroutine());
+  function* get(): Operation<T | undefined> {    
+    return (yield Do((coroutine) => Ok(getContext(context, coroutine)))) as T | undefined;
   }
 
   function* set(value: T): Operation<T> {
-    return setContext(context, yield* useCoroutine(), value);
+    return (yield Do((routine) => Ok(setContext(context, routine, value)))) as T;
   }
 
   function* expect(): Operation<T> {
