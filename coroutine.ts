@@ -1,7 +1,7 @@
-import { Do, Done, type Instruction, Resume, Suspend } from "./control.ts";
+import { Do, type Instruction, Resume } from "./control.ts";
 import { DelimitedStack } from "./delimited-stack.ts";
 import { Reducer } from "./reducer.ts";
-import { Err, Ok, Result } from "./result.ts";
+import { Err, Ok } from "./result.ts";
 import type { Coroutine, Delimiter, Operation } from "./types.ts";
 
 export interface CoroutineOptions<T> {
@@ -47,14 +47,21 @@ export function* useCoroutine(): Operation<Coroutine> {
 export function controlScope<T>(): Delimiter<T, T> {
   return function* control(routine, next) {
     try {
-      yield Do(({ stack, next }) => next(Resume(Ok(stack.pushDelimiter()))));
+      yield pushd;
       return yield* next(routine);
     } catch (error) {
-      throw yield Do(({ stack, next }) =>
-        next(Resume(Ok(stack.setDelimiterExitResult(Err(error)))))
-      );
+      throw yield setd(error);
     } finally {
-      yield Do(({ stack, next }) => next(Resume(stack.popDelimiter())));
+      yield popd;
     }
   };
 }
+
+const pushd = Do(({ stack, next }) => next(Resume(Ok(stack.pushDelimiter()))));
+
+const popd = Do(({ stack, next }) => next(Resume(stack.popDelimiter())));
+
+const setd = (error: Error) =>
+  Do(({ stack, next }) =>
+    next(Resume(Ok(stack.setDelimiterExitResult(Err(error)))))
+  );
