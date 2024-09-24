@@ -1,20 +1,20 @@
 import { Result } from "./result.ts";
-import { Coroutine, Instruction, Reject, Resolve } from "./types.ts";
+import { Coroutine, Reject, Resolve } from "./types.ts";
 
-export type Control =
+export type Instruction =
   | Resume
   | Suspend
   | Break
   | Done
-  | Do
+  | Do;
 
 export interface Done {
   method: "done";
   result: Result<unknown>;
 }
 
-export function Done(result: Result<unknown>): Instruction<Done> {
-  return { handler: "@effection/coroutine", data: { method: "done", result } };
+export function Done(result: Result<unknown>): Done {
+  return { method: "done", result };
 }
 
 export interface Suspend {
@@ -28,11 +28,8 @@ export interface Unsuspend<T> {
 
 export function Suspend<T = void>(
   unsuspend?: Unsuspend<T>,
-): Instruction<Suspend> {
-  return {
-    handler: "@effection/coroutine",
-    data: { method: "suspend", unsuspend },
-  };
+): Suspend {
+  return { method: "suspend", unsuspend };
 }
 
 export interface Resume {
@@ -40,10 +37,10 @@ export interface Resume {
   result: Result<unknown>;
 }
 
-export function Resume(result: Result<unknown>): Instruction<Resume> {
+export function Resume(result: Result<unknown>): Resume {
   return {
-    handler: "@effection/coroutine",
-    data: { method: "resume", result },
+    method: "resume",
+    result,
   };
 }
 
@@ -52,8 +49,8 @@ export interface Break {
   result: Result<void>;
 }
 
-export function Break(result: Result<void>): Instruction<Break> {
-  return { handler: "@effection/coroutine", data: { method: "break", result } };
+export function Break(result: Result<void>): Break {
+  return { method: "break", result };
 }
 
 export interface Do {
@@ -61,6 +58,6 @@ export interface Do {
   fn(routine: Coroutine): void;
 }
 
-export function Do(fn: (routine: Coroutine) => void): Instruction<Do> {
-  return { handler: "@effection/coroutine", data: { method: "do", fn } };
+export function Do(fn: (routine: Coroutine) => void): Do {
+  return { method: "do", fn };
 }

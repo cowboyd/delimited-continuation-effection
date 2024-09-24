@@ -1,10 +1,10 @@
 import { createContext } from "./context.ts";
-import { Break, Do, Resume } from "./control.ts";
+import { Break, Do, Instruction, Resume } from "./control.ts";
 import { controlScope, createCoroutine } from "./coroutine.ts";
 import { compose } from "./delimiter.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Delimiter, Instruction } from "./types.ts";
+import { Delimiter } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
@@ -35,7 +35,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
       state.halted = true;
       routine.next(Break(Ok()));
     }
-  })
+  });
 
   let halt = () => createHalt(routine, finalized.future, halt_i);
 

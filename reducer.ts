@@ -1,6 +1,6 @@
-import { Resume } from "./control.ts";
-import { Err } from "./result.ts";
-import { Coroutine, Instruction } from "./types.ts";
+import { Done, Instruction, Resume, Suspend } from "./control.ts";
+import { Err, Ok, Result } from "./result.ts";
+import { Coroutine } from "./types.ts";
 
 export class Reducer {
   reducing = false;
@@ -17,19 +17,76 @@ export class Reducer {
       let item = queue.pop();
       while (item) {
         [routine, instruction] = item;
-        let { handler: handlerName, data } = instruction;
-        let handler = routine.handlers[handlerName];
-        if (!handler) {
-          let error = new Error(handlerName);
-          error.name = `UnknownHandler`;
-          this.reduce(routine, Resume(Err(error)));
-        } else {
-          handler(routine, data);
-        }
+        this.dispatch(routine, instruction);
         item = queue.pop();
       }
     } finally {
       this.reducing = false;
     }
   };
+
+  dispatch(routine: Coroutine, instruction: Instruction) {
+    try {
+      const iterator = routine.instructions();
+      if (instruction.method === "resume") {
+        let result = instruction.result;
+        if (result.ok) {
+          let next = iterator.next(result.value);
+          if (next.done) {
+            routine.next(Done(Ok(next.value)));
+          } else {
+            routine.next(next.value);
+          }
+        } else if (iterator.throw) {
+          let next = iterator.throw(result.error);
+          if (next.done) {
+            routine.next(Done(Ok(next.value)));
+          } else {
+            routine.next(next.value);
+          }
+        } else {
+          throw result.error;
+        }
+      } else if (instruction.method === "break") {
+        routine.stack.setDelimiterExitResult(instruction.result);
+
+        if (iterator.return) {
+          let next = iterator.return();
+          if (next.done) {
+            routine.next(Done(Ok(next.value)));
+          } else {
+            routine.next(next.value);
+          }
+        } else {
+          routine.next(Done(Ok()));
+        }
+      } else if (instruction.method === "suspend") {
+        if (instruction.unsuspend) {
+          let { unsuspend } = instruction;
+          let settlement: Result<unknown> | void = void 0;
+          let settle = (result: Result<unknown>) => {
+            if (!settlement) {
+              settlement = result;
+              routine.next(Resume(settlement));
+            }
+          };
+          let resolve = (value: unknown) => settle(Ok(value));
+          let reject = (error: Error) => settle(Err(error));
+
+          routine.next(Resume(Ok((function* suspend() {
+            let exit = unsuspend(resolve, reject) ?? (() => {});
+            try {
+              return (yield Suspend()) as unknown;
+            } finally {
+              exit();
+            }
+          })())));
+        }
+      } else if (instruction.method === "do") {
+        instruction.fn(routine);
+      }
+    } catch (error) {
+      routine.next(Done(Err(error)));
+    }
+  }
 }

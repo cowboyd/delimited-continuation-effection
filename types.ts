@@ -1,4 +1,5 @@
 import type { Result } from "./result.ts";
+import type { Instruction } from "./control.ts";
 
 export interface Operation<T> {
   [Symbol.iterator](): Iterator<Instruction, T, unknown>;
@@ -30,10 +31,9 @@ export interface Coroutine<T = unknown> {
     popDelimiter(): Result<unknown>;
     setDelimiterExitResult(result: Result<unknown>): Result<unknown>;
   };
-  handlers: Record<string, InstructionHandler>;
   instructions(): Iterator<Instruction, T, unknown>;
   reduce(routine: Coroutine, instruction: Instruction): void;
-  next<I>(instruction: Instruction<I>): void;
+  next<I>(instruction: Instruction): void;
 }
 
 export interface Context<T> {
@@ -49,15 +49,6 @@ export interface Delimiter<T, TReturn = T> {
     routine: Coroutine,
     next: (routine: Coroutine) => Operation<T>,
   ): Operation<TReturn>;
-}
-
-export interface Instruction<TData = unknown> {
-  handler: string;
-  data: TData;
-}
-
-export interface InstructionHandler<TData = unknown> {
-  (routine: Coroutine, data: TData): void;
 }
 
 export type Resolve<T> = (value: T) => void;

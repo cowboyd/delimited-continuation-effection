@@ -6,12 +6,16 @@ import { getContext, setContext } from "./-context.ts";
 export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   let context: Context<T> = { name, get, set, expect, defaultValue };
 
-  function* get(): Operation<T | undefined> {    
-    return (yield Do((routine) => routine.next(Resume(Ok(getContext(context, routine)))))) as T | undefined;
+  function* get(): Operation<T | undefined> {
+    return (yield Do((routine) =>
+      routine.next(Resume(Ok(getContext(context, routine))))
+    )) as T | undefined;
   }
 
   function* set(value: T): Operation<T> {
-    return (yield Do((routine) => routine.next(Resume(Ok(setContext(context, routine, value)))))) as T;
+    return (yield Do((routine) =>
+      routine.next(Resume(Ok(setContext(context, routine, value))))
+    )) as T;
   }
 
   function* expect(): Operation<T> {
