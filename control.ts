@@ -58,9 +58,9 @@ export function Break(result: Result<void>): Instruction<Break> {
 
 export interface Do {
   method: "do";
-  fn(routine: Coroutine): Result<unknown>;
+  fn(routine: Coroutine): void;
 }
 
-export function Do(fn: (routine: Coroutine) => Result<unknown>): Instruction<Do> {
+export function Do(fn: (routine: Coroutine) => void): Instruction<Do> {
   return { handler: "@effection/coroutine", data: { method: "do", fn } };
 }

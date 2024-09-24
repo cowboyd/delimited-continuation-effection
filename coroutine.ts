@@ -21,7 +21,6 @@ export interface CoroutineOptions<T> {
   operation(routine: Coroutine): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
   context?: Record<string, unknown>;
-  handlers?: { [name: string]: InstructionHandler };
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
@@ -30,7 +29,6 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     reduce = new Reducer().reduce,
     name = options.operation.name,
     context,
-    handlers,
   } = options;
 
   let iterator: Iterator<Instruction, T, unknown> | undefined;
@@ -39,7 +37,7 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     name,
     stack: new DelimitedStack(),
     context: Object.create(context ?? null),
-    handlers: Object.assign(controlHandlers(), handlers),
+    handlers: controlHandlers() as Record<string, InstructionHandler>,
     reduce,
     instructions() {
       if (!iterator) {
@@ -54,27 +52,24 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
 }
 
 export function* useCoroutine(): Operation<Coroutine> {  
-  return (yield Do((routine) => Ok(routine))) as Coroutine;
+  return (yield Do((routine) => routine.next(Resume(Ok(routine))))) as Coroutine;
 }
 
 export function controlScope<T>(): Delimiter<T, T> {
   return function* control(routine, next) {
     try {
-      yield Do(({ stack }) => Ok(stack.pushDelimiter()));
+      yield Do(({ stack, next }) => next(Resume(Ok(stack.pushDelimiter()))));
       return yield* next(routine);
     } catch (error) {
-      throw yield Do(({stack}) => stack.setDelimiterExitResult((Err(error))));
+      throw yield Do(({stack, next}) => next(Resume(Ok(stack.setDelimiterExitResult((Err(error)))))));
     } finally {
-      yield Do(({ stack }) => stack.popDelimiter());
+      yield Do(({ stack, next }) => next(Resume(stack.popDelimiter())));
     }
   };
 }
 
 function controlHandlers() {
   return {
-    ["@effection/self"](routine: Coroutine) {
-      routine.next(Resume(Ok(routine)));
-    },
     ["@effection/coroutine"](routine: Coroutine, control: Control) {
       try {
         const iterator = routine.instructions();
@@ -133,12 +128,11 @@ function controlHandlers() {
             })())));
           }
         } else if (control.method === "do") {
-	  let result = control.fn(routine);
-	  routine.next(Resume(result));
+	  control.fn(routine);	  
 	}
       } catch (error) {
         routine.next(Done(Err(error)));
       }
     },
-  };
+  } as const;
 }

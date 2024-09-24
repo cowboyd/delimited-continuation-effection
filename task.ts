@@ -1,11 +1,10 @@
-import { getContext } from "./-context.ts";
 import { createContext } from "./context.ts";
-import { Break, Resume } from "./control.ts";
+import { Break, Do, Resume } from "./control.ts";
 import { controlScope, createCoroutine } from "./coroutine.ts";
 import { compose } from "./delimiter.ts";
 import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Delimiter, Instruction, InstructionHandler } from "./types.ts";
+import { Delimiter, Instruction } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
@@ -21,8 +20,6 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   let state = { halted: false };
 
-  let handlers = taskHandlers(state);
-
   let delimit = compose([
     delimitTask(state, result, finalized),
     controlScope(),
@@ -31,11 +28,16 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   let operation = (routine: Coroutine) => delimit(routine, options.operation);
 
-  let routine = createCoroutine({ name, operation, reduce, context, handlers });
+  let routine = createCoroutine({ name, operation, reduce, context });
 
-  let halted: Future<void> | undefined = void 0;
+  let halt_i = Do(() => {
+    if (!state.halted) {
+      state.halted = true;
+      routine.next(Break(Ok()));
+    }
+  })
 
-  let halt = () => halted ? halted : createHalt(routine, finalized.future);
+  let halt = () => createHalt(routine, finalized.future, halt_i);
 
   let task: Task<T> = Object.create(result.future, {
     [Symbol.toStringTag]: {
@@ -52,46 +54,6 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 }
 
 const Children = createContext<Set<Task<unknown>>>("@effection/task.children");
-
-function taskHandlers(state: { halted: boolean }) {
-  return {
-    ["@effection/task.spawn"]<T>(
-      routine: Coroutine,
-      op: () => Operation<T>,
-    ) {
-      let children = getContext(Children, routine);
-      if (!children) {
-        routine.next(Resume(Err(new Error(`no children found!!`))));
-        return;
-      }
-      let [start, task] = createTask({
-        context: routine.context,
-        operation: function* child() {
-          try {
-            return yield* op();
-          } catch (error) {
-            routine.next(Break(Err(error)));
-            throw error;
-          } finally {
-            if (typeof task !== "undefined") {
-              children.delete(task);
-            }
-          }
-        },
-        reduce: routine.reduce,
-      });
-      children.add(task);
-      routine.next(Resume(Ok(task)));
-      start();
-    },
-    ["@effection/task.halt"](routine: Coroutine) {
-      if (!state.halted) {
-        state.halted = true;
-        routine.next(Break(Ok()));
-      }
-    },
-  } as Record<string, InstructionHandler>;
-}
 
 export function spawnScope<T>(): Delimiter<T, T> {
   return function* spawnScope(routine, next) {
@@ -142,22 +104,19 @@ function delimitTask<T>(
   };
 }
 
-function Halt(): Instruction<void> {
-  return { handler: "@effection/task.halt" } as Instruction<void>;
-}
-
 function createHalt(
   routine: Coroutine,
   finalized: Future<void>,
+  halt_i: Instruction,
 ): Future<void> {
   return {
     [Symbol.toStringTag]: "Future",
     *[Symbol.iterator]() {
-      routine.next(Halt());
+      routine.next(halt_i);
       return yield* finalized;
     },
     then: (fn, ...args) => {
-      routine.next(Halt());
+      routine.next(halt_i);
       if (fn) {
         return finalized.then(() => fn(), ...args);
       } else {
