@@ -1,8 +1,7 @@
 import { createContext } from "./context.ts";
-import { Break, Do, Instruction, Resume } from "./control.ts";
+import { Do, Instruction, Resume } from "./control.ts";
 import { controlScope, createCoroutine } from "./coroutine.ts";
-import { compose } from "./delimiter.ts";
-import { createFutureWithResolvers, FutureWithResolvers } from "./future.ts";
+import { createFutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
 import { Delimiter } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
@@ -20,13 +19,25 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   let state = { halted: false };
 
-  let delimit = compose([
-    delimitTask(state, result, finalized),
-    controlScope(),
-    spawnScope(),
-  ]);
+  function* operation(routine: Coroutine): Operation<void> {
+    try {
+      let value = yield* controlScope<T>()(routine, function* () {
+        return yield* spawnScope<T>()(routine, options.operation);
+      });
 
-  let operation = (routine: Coroutine) => delimit(routine, options.operation);
+      if (!state.halted) {
+        result.resolve(value);
+      }
+    } catch (error) {
+      result.reject(error);
+      finalized.reject(error);
+    } finally {
+      finalized.resolve();
+      if (state.halted) {
+        result.reject(new Error("halted"));
+      }
+    }
+  }
 
   let routine = createCoroutine({ name, operation, reduce, context });
 
@@ -75,30 +86,6 @@ export function spawnScope<T>(): Delimiter<T, T> {
       }
       if (!teardown.ok) {
         throw teardown.error;
-      }
-    }
-  };
-}
-
-function delimitTask<T>(
-  state: { halted: boolean },
-  result: FutureWithResolvers<T>,
-  finalized: FutureWithResolvers<void>,
-): Delimiter<T, void> {
-  return function* task(routine, resume) {
-    try {
-      let value = yield* resume(routine);
-
-      if (!state.halted) {
-        result.resolve(value);
-      }
-    } catch (error) {
-      result.reject(error);
-      finalized.reject(error);
-    } finally {
-      finalized.resolve();
-      if (state.halted) {
-        result.reject(new Error("halted"));
       }
     }
   };
