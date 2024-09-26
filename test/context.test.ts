@@ -3,11 +3,11 @@ import { describe, expect, it } from "./suite.ts";
 import {
   contextScope,
   createContext,
-  delimit,
   run,
   sleep,
   spawn,
 } from "../mod.ts";
+import { useCoroutine } from "../coroutine.ts";
 
 const numbers = createContext("number", 3);
 
@@ -23,7 +23,9 @@ describe("context", () => {
   it("can be set within a given scope, but reverts after", async () => {
     let values = await run(function* () {
       let before = yield* numbers.get();
-      let within = yield* delimit([contextScope()], function* () {
+      let routine = yield* useCoroutine();
+
+      let within = yield* contextScope()(routine, function* () {
         yield* numbers.set(22);
         return yield* numbers.get();
       });
