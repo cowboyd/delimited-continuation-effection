@@ -20,10 +20,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   function* operation(): Operation<void> {
     try {
-      let value = yield* controlScope<T>(function* () {
-        return yield* spawnScope<T>(options.operation);
-      });
-
+      let value = yield* controlScope<T>(() => spawnScope<T>(options.operation));
       if (!state.halted) {
         result.resolve(value);
       }
