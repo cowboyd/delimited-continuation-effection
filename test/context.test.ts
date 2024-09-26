@@ -1,6 +1,6 @@
 import { describe, expect, it } from "./suite.ts";
 
-import { contextScope, createContext, run, sleep, spawn } from "../mod.ts";
+import { contextBounds, createContext, run, sleep, spawn } from "../mod.ts";
 
 const numbers = createContext("number", 3);
 
@@ -17,7 +17,7 @@ describe("context", () => {
     let values = await run(function* () {
       let before = yield* numbers.get();
 
-      let within = yield* contextScope(function* () {
+      let within = yield* contextBounds(function* () {
         yield* numbers.set(22);
         return yield* numbers.get();
       });

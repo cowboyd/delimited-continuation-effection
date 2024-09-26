@@ -1,7 +1,7 @@
 import { suspend } from "./suspend.ts";
 import { spawn } from "./spawn.ts";
 import { Operation } from "./types.ts";
-import { controlScope, useCoroutine } from "./coroutine.ts";
+import { controlBounds, useCoroutine } from "./coroutine.ts";
 import { Do, Resume } from "./control.ts";
 import { Ok } from "./result.ts";
 
@@ -21,7 +21,7 @@ export function* resource<T>(
 
   // establishing a control boundary lets us catch errors in
   // resource initializer
-  return yield* controlScope<T>(function* () {
+  return yield* controlBounds<T>(function* () {
     yield* spawn(() => op(provide));
 
     return (yield Do(() => {})) as T;

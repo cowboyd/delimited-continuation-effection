@@ -44,7 +44,7 @@ export function* useCoroutine(): Operation<Coroutine> {
   )) as Coroutine;
 }
 
-export function* controlScope<T>(op: () => Operation<T>): Operation<T> {
+export function* controlBounds<T>(op: () => Operation<T>): Operation<T> {
   try {
     yield pushd;
     return yield* op();

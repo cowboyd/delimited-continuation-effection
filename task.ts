@@ -1,6 +1,6 @@
 import { createContext } from "./context.ts";
 import { Do, Instruction, Resume } from "./control.ts";
-import { controlScope, createCoroutine } from "./coroutine.ts";
+import { controlBounds, createCoroutine } from "./coroutine.ts";
 import { createFutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
@@ -20,7 +20,9 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   function* operation(): Operation<void> {
     try {
-      let value = yield* controlScope<T>(() => spawnScope<T>(options.operation));
+      let value = yield* controlBounds<T>(() =>
+        taskBounds<T>(options.operation)
+      );
       if (!state.halted) {
         result.resolve(value);
       }
@@ -62,28 +64,27 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
 const Children = createContext<Set<Task<unknown>>>("@effection/task.children");
 
-export function* spawnScope<T>(op: () => Operation<T>): Operation<T> {
-
-    let children = yield* Children.set(new Set());
-    try {
-      return yield* op();
-    } finally {
-      let teardown = Ok();
-      while (children.size > 0) {
-        for (let child of [...children].reverse()) {
-          try {
-            yield* child.halt();
-          } catch (error) {
-            teardown = Err(error);
-          } finally {
-            children.delete(child);
-          }
+export function* taskBounds<T>(op: () => Operation<T>): Operation<T> {
+  let children = yield* Children.set(new Set());
+  try {
+    return yield* op();
+  } finally {
+    let teardown = Ok();
+    while (children.size > 0) {
+      for (let child of [...children].reverse()) {
+        try {
+          yield* child.halt();
+        } catch (error) {
+          teardown = Err(error);
+        } finally {
+          children.delete(child);
         }
       }
-      if (!teardown.ok) {
-        throw teardown.error;
-      }
     }
+    if (!teardown.ok) {
+      throw teardown.error;
+    }
+  }
 }
 
 function createHalt(

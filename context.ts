@@ -32,7 +32,7 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   return context;
 }
 
-export function* contextScope<T>(op: () => Operation<T>): Operation<T> {
+export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
   let routine = yield* useCoroutine();
   let original = routine.context;
   routine.context = Object.create(original);
