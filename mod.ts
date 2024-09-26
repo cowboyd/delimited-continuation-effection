@@ -4,4 +4,5 @@ export * from "./suspend.ts";
 export * from "./spawn.ts";
 export * from "./run.ts";
 export * from "./context.ts";
+export * from "./resource.ts";
 export * from "./delimiter.ts";

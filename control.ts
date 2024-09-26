@@ -1,9 +1,8 @@
 import { Result } from "./result.ts";
-import { Coroutine, Reject, Resolve } from "./types.ts";
+import { Coroutine } from "./types.ts";
 
 export type Instruction =
   | Resume
-  | Suspend
   | Break
   | Done
   | Do;
@@ -15,21 +14,6 @@ export interface Done {
 
 export function Done(result: Result<unknown>): Done {
   return { method: "done", result };
-}
-
-export interface Suspend {
-  method: "suspend";
-  unsuspend?: Unsuspend<unknown>;
-}
-
-export interface Unsuspend<T> {
-  (resolve: Resolve<T>, reject: Reject): () => void;
-}
-
-export function Suspend<T = void>(
-  unsuspend?: Unsuspend<T>,
-): Suspend {
-  return { method: "suspend", unsuspend };
 }
 
 export interface Resume {

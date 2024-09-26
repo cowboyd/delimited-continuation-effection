@@ -1,5 +1,5 @@
-import { Done, Instruction, Resume, Suspend } from "./control.ts";
-import { Err, Ok, Result } from "./result.ts";
+import { Done, Instruction } from "./control.ts";
+import { Err, Ok } from "./result.ts";
 import { Coroutine } from "./types.ts";
 
 export class Reducer {
@@ -59,28 +59,6 @@ export class Reducer {
           }
         } else {
           routine.next(Done(Ok()));
-        }
-      } else if (instruction.method === "suspend") {
-        if (instruction.unsuspend) {
-          let { unsuspend } = instruction;
-          let settlement: Result<unknown> | void = void 0;
-          let settle = (result: Result<unknown>) => {
-            if (!settlement) {
-              settlement = result;
-              routine.next(Resume(settlement));
-            }
-          };
-          let resolve = (value: unknown) => settle(Ok(value));
-          let reject = (error: Error) => settle(Err(error));
-
-          routine.next(Resume(Ok((function* suspend() {
-            let exit = unsuspend(resolve, reject) ?? (() => {});
-            try {
-              return (yield Suspend()) as unknown;
-            } finally {
-              exit();
-            }
-          })())));
         }
       } else if (instruction.method === "do") {
         instruction.fn(routine);
