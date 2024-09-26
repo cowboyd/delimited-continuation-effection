@@ -2,7 +2,6 @@ import { suspend } from "./suspend.ts";
 import { spawn } from "./spawn.ts";
 import { Operation } from "./types.ts";
 import { controlScope, useCoroutine } from "./coroutine.ts";
-import { delimit } from "./delimiter.ts";
 import { Do, Resume } from "./control.ts";
 import { Ok } from "./result.ts";
 
@@ -20,16 +19,12 @@ export function* resource<T>(
     yield* suspend();
   }
 
-  // by delimiting control scope here, this allows us to catch errors in resource initialization
-  return yield* delimit([controlScope()], function* () {
-    yield* spawn(function* () { // <- this is the resource task
-      yield* op(provide);
-    });
 
-    let value = yield Do(() => {});
-    return value as T;
+  // establishing a control boundary lets us catch errors in
+  // resource initializer
+  return yield* controlScope<T>()(caller, function*() {
+    yield* spawn(() => op(provide));
+
+    return (yield Do(() => {})) as T;
   });
-
-  // once the resource has called provide(value), and we leave the control delimitation
-  // a resource failure will crash (up to the next control point)
 }
