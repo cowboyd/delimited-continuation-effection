@@ -59,9 +59,9 @@ export function controlScope<T>(): Delimiter<T, T> {
 
 const pushd = Do(({ stack, next }) => next(Resume(Ok(stack.pushDelimiter()))));
 
-const popd = Do(({ stack, next }) => next(Resume(stack.popDelimiter())));
+const popd = Do(({ stack, next }) => next(stack.popDelimiter()));
 
 const setd = (error: Error) =>
   Do(({ stack, next }) =>
-    next(Resume(Ok(stack.setDelimiterExitResult(Err(error)))))
+    next(stack.setExitWith(Resume(Err(error))))
   );

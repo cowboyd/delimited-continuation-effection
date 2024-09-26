@@ -22,7 +22,7 @@ export function spawn<T>(op: () => Operation<T>): Operation<Task<T>> {
             try {
               return yield* op();
             } catch (error) {
-              routine.next(Break(Err(error)));
+              routine.next(Break(Resume(Err(error))));
               throw error;
             } finally {
               if (typeof task !== "undefined") {

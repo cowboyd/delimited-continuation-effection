@@ -22,19 +22,16 @@ export interface Resume {
 }
 
 export function Resume(result: Result<unknown>): Resume {
-  return {
-    method: "resume",
-    result,
-  };
+  return { method: "resume", result };
 }
 
 export interface Break {
   method: "break";
-  result: Result<void>;
+  instruction: Instruction;
 }
 
-export function Break(result: Result<void>): Break {
-  return { method: "break", result };
+export function Break(instruction: Instruction): Break {
+  return { method: "break", instruction };
 }
 
 export interface Do {

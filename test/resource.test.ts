@@ -9,11 +9,10 @@ function createResource(container: State): Operation<State> {
       yield* sleep(5);
       container.status = "active";
     });
-    console.log("preinit sleep");
+    
     yield* sleep(1);
 
     try {
-      console.log("post init sleep");
       yield* provide(container);
     } finally {
       container.status = "finalized";
@@ -67,16 +66,14 @@ describe("resource", () => {
     expect(result.status).toEqual("finalized");
   });
 
-  it.skip("can halt the resource constructor if the containing task halts", async () => {
+  it("can halt the resource constructor if the containing task halts", async () => {
     let state = { status: "pending" };
     let task = run(function* () {
-      yield* createResource(state);
-      console.log("resource created");
+      yield* createResource(state);      
       yield* suspend();
     });
-    console.log("task will halt");
+
     await task.halt();
-    console.log("task did halt");
 
     expect(state.status).toEqual("pending");
   });

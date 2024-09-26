@@ -28,8 +28,8 @@ export interface Coroutine<T = unknown> {
   context: Record<string, unknown>;
   stack: {
     pushDelimiter(): void;
-    popDelimiter(): Result<unknown>;
-    setDelimiterExitResult(result: Result<unknown>): Result<unknown>;
+    popDelimiter(): Instruction;
+    setExitWith(instruction: Instruction): Instruction;
   };
   instructions(): Iterator<Instruction, T, unknown>;
   reduce(routine: Coroutine, instruction: Instruction): void;

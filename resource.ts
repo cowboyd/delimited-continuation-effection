@@ -15,7 +15,7 @@ export function* resource<T>(
 ): Operation<T> {
   let caller = yield* useCoroutine();
 
-  function* provide(value: T) {
+  function* provide(value: T): Operation<void> {
     caller.next(Resume(Ok(value)));
     yield* suspend();
   }
@@ -29,6 +29,7 @@ export function* resource<T>(
     let value = yield Do(() => {});
     return value as T;
   });
+
   // once the resource has called provide(value), and we leave the control delimitation
   // a resource failure will crash (up to the next control point)
 }

@@ -48,7 +48,7 @@ export class Reducer {
           throw result.error;
         }
       } else if (instruction.method === "break") {
-        routine.stack.setDelimiterExitResult(instruction.result);
+        routine.stack.setExitWith(instruction.instruction);
 
         if (iterator.return) {
           let next = iterator.return();
