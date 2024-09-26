@@ -2,13 +2,13 @@ import { Do, type Instruction, Resume } from "./control.ts";
 import { DelimitedStack } from "./delimited-stack.ts";
 import { Reducer } from "./reducer.ts";
 import { Err, Ok } from "./result.ts";
-import type { Coroutine, Operation } from "./types.ts";
+import type { Coroutine, Operation, Scope } from "./types.ts";
 
 export interface CoroutineOptions<T> {
   name?: string;
   operation(routine: Coroutine): Operation<T>;
   reduce?(routine: Coroutine, instruction: Instruction): void;
-  context?: Record<string, unknown>;
+  scope: Scope;
 }
 
 export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
@@ -16,15 +16,15 @@ export function createCoroutine<T>(options: CoroutineOptions<T>): Coroutine<T> {
     operation,
     reduce = new Reducer().reduce,
     name = options.operation.name,
-    context,
+    scope,
   } = options;
 
   let iterator: Iterator<Instruction, T, unknown> | undefined;
 
   let routine: Coroutine<T> = {
     name,
+    scope,
     stack: new DelimitedStack(),
-    context: Object.create(context ?? null),
     reduce,
     instructions() {
       if (!iterator) {

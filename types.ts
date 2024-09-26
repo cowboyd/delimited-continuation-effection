@@ -11,11 +11,11 @@ export interface Task<T> extends Future<T> {
 }
 
 export interface Scope {
-  // readonly context: Record<string, unknown>;
-  get<T>(context: Context<T>): T;
+  get<T>(context: Context<T>): T | undefined;
   set<T>(context: Context<T>, value: T): T;
+  //run<T>(operation: () => Operation<T>): Task<T>;
   // spawn<T>(operation: () => Operation<T>): Operation<Task<T>>;
-  // eval<T>(operation: Operation<T>): Operation<T>;
+  eval<T>(operation: () => Operation<T>): Operation<T>;
 }
 
 export type Yielded<T extends Operation<unknown>> = T extends
@@ -24,7 +24,7 @@ export type Yielded<T extends Operation<unknown>> = T extends
 
 export interface Coroutine<T = unknown> {
   name: string;
-  context: Record<string, unknown>;
+  scope: Scope;
   stack: {
     haltInstruction: Instruction;
     pushDelimiter(): void;

@@ -1,21 +1,20 @@
 import { Context, Operation } from "./types.ts";
 import { Do, Resume } from "./control.ts";
 import { Ok } from "./result.ts";
-import { getContext, setContext } from "./-context.ts";
-import { useCoroutine } from "./coroutine.ts";
+import { createScope, useScope } from "./scope.ts";
 
 export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   let context: Context<T> = { name, get, set, expect, defaultValue };
 
   function* get(): Operation<T | undefined> {
-    return (yield Do((routine) =>
-      routine.next(Resume(Ok(getContext(context, routine))))
+    return (yield Do(({ next, scope }) =>
+      next(Resume(Ok(scope.get(context))))
     )) as T | undefined;
   }
 
   function* set(value: T): Operation<T> {
-    return (yield Do((routine) =>
-      routine.next(Resume(Ok(setContext(context, routine, value))))
+    return (yield Do(({ next, scope }) =>
+      next(Resume(Ok(scope.set(context, value))))
     )) as T;
   }
 
@@ -33,12 +32,7 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
 }
 
 export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
-  let routine = yield* useCoroutine();
-  let original = routine.context;
-  routine.context = Object.create(original);
-  try {
-    return yield* op();
-  } finally {
-    routine.context = original;
-  }
+  let scope = yield* useScope();
+  let child = createScope(scope);
+  return yield* child.eval(op);
 }
