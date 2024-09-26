@@ -1,4 +1,3 @@
-import type { Result } from "./result.ts";
 import type { Instruction } from "./control.ts";
 
 export interface Operation<T> {
@@ -43,13 +42,6 @@ export interface Context<T> {
   get(): Operation<T | undefined>;
   set(value: T): Operation<T>;
   expect(): Operation<T>;
-}
-
-export interface Delimiter<T, TReturn = T> {
-  (
-    routine: Coroutine,
-    next: (routine: Coroutine) => Operation<T>,
-  ): Operation<TReturn>;
 }
 
 export type Resolve<T> = (value: T) => void;

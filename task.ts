@@ -3,7 +3,6 @@ import { Do, Instruction, Resume } from "./control.ts";
 import { controlScope, createCoroutine } from "./coroutine.ts";
 import { createFutureWithResolvers } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Delimiter } from "./types.ts";
 import { Coroutine, Future, Operation, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
@@ -19,10 +18,10 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   let state = { halted: false };
 
-  function* operation(routine: Coroutine): Operation<void> {
+  function* operation(): Operation<void> {
     try {
       let value = yield* controlScope<T>(function* () {
-        return yield* spawnScope<T>()(routine, options.operation);
+        return yield* spawnScope<T>(options.operation);
       });
 
       if (!state.halted) {
@@ -66,11 +65,11 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
 const Children = createContext<Set<Task<unknown>>>("@effection/task.children");
 
-export function spawnScope<T>(): Delimiter<T, T> {
-  return function* spawnScope(routine, next) {
+export function* spawnScope<T>(op: () => Operation<T>): Operation<T> {
+
     let children = yield* Children.set(new Set());
     try {
-      return yield* next(routine);
+      return yield* op();
     } finally {
       let teardown = Ok();
       while (children.size > 0) {
@@ -88,7 +87,6 @@ export function spawnScope<T>(): Delimiter<T, T> {
         throw teardown.error;
       }
     }
-  };
 }
 
 function createHalt(

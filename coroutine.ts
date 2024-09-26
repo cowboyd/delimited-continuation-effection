@@ -2,7 +2,7 @@ import { Do, type Instruction, Resume } from "./control.ts";
 import { DelimitedStack } from "./delimited-stack.ts";
 import { Reducer } from "./reducer.ts";
 import { Err, Ok } from "./result.ts";
-import type { Coroutine, Delimiter, Operation } from "./types.ts";
+import type { Coroutine, Operation } from "./types.ts";
 
 export interface CoroutineOptions<T> {
   name?: string;
