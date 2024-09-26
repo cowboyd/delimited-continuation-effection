@@ -9,7 +9,7 @@ function createResource(container: State): Operation<State> {
       yield* sleep(5);
       container.status = "active";
     });
-    
+
     yield* sleep(1);
 
     try {
@@ -69,7 +69,7 @@ describe("resource", () => {
   it("can halt the resource constructor if the containing task halts", async () => {
     let state = { status: "pending" };
     let task = run(function* () {
-      yield* createResource(state);      
+      yield* createResource(state);
       yield* suspend();
     });
 

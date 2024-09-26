@@ -62,6 +62,4 @@ const pushd = Do(({ stack, next }) => next(Resume(Ok(stack.pushDelimiter()))));
 const popd = Do(({ stack, next }) => next(stack.popDelimiter()));
 
 const setd = (error: Error) =>
-  Do(({ stack, next }) =>
-    next(stack.setExitWith(Resume(Err(error))))
-  );
+  Do(({ stack, next }) => next(stack.setExitWith(Resume(Err(error)))));

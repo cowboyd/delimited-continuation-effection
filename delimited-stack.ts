@@ -1,4 +1,4 @@
-import { Instruction, Resume } from "./control.ts";
+import { Break, Instruction, Resume } from "./control.ts";
 import { Err, Ok } from "./result.ts";
 
 export class DelimitedStack {
@@ -30,5 +30,9 @@ export class DelimitedStack {
       this.delimiters.push(instruction);
     }
     return this.delimiters[this.delimiters.length - 1];
+  }
+
+  get haltInstruction(): Instruction {
+    return this.delimiters.reduce(Break, Break(Resume(Ok())));
   }
 }

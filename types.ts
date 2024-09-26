@@ -27,6 +27,7 @@ export interface Coroutine<T = unknown> {
   name: string;
   context: Record<string, unknown>;
   stack: {
+    haltInstruction: Instruction;
     pushDelimiter(): void;
     popDelimiter(): Instruction;
     setExitWith(instruction: Instruction): Instruction;

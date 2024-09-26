@@ -33,12 +33,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   let halt_i = Do(() => {
     if (!state.halted) {
       state.halted = true;
-      //@ts-expect-error will fix later
-      let delimiters: Instruction[] = routine.stack.delimiters;
-
-      let instruction = delimiters.reduce(Break, Break(Resume(Ok())));
-
-      routine.next(instruction);
+      routine.next(routine.stack.haltInstruction);
     }
   });
 
