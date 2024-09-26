@@ -44,17 +44,15 @@ export function* useCoroutine(): Operation<Coroutine> {
   )) as Coroutine;
 }
 
-export function controlScope<T>(): Delimiter<T, T> {
-  return function* control(routine, next) {
-    try {
-      yield pushd;
-      return yield* next(routine);
-    } catch (error) {
-      throw yield setd(error);
-    } finally {
-      yield popd;
-    }
-  };
+export function* controlScope<T>(op: () => Operation<T>): Operation<T> {
+  try {
+    yield pushd;
+    return yield* op();
+  } catch (error) {
+    throw yield setd(error);
+  } finally {
+    yield popd;
+  }
 }
 
 const pushd = Do(({ stack, next }) => next(Resume(Ok(stack.pushDelimiter()))));

@@ -8,6 +8,6 @@ export function* scoped<T>(op: () => Operation<T>): Operation<T> {
 
   return yield* contextScope<T>()(
     routine,
-    () => controlScope<T>()(routine, () => spawnScope<T>()(routine, op)),
+    () => controlScope<T>(() => spawnScope<T>()(routine, op)),
   );
 }

@@ -21,7 +21,7 @@ export function* resource<T>(
 
   // establishing a control boundary lets us catch errors in
   // resource initializer
-  return yield* controlScope<T>()(caller, function* () {
+  return yield* controlScope<T>(function* () {
     yield* spawn(() => op(provide));
 
     return (yield Do(() => {})) as T;

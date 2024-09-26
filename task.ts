@@ -21,7 +21,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   function* operation(routine: Coroutine): Operation<void> {
     try {
-      let value = yield* controlScope<T>()(routine, function* () {
+      let value = yield* controlScope<T>(function* () {
         return yield* spawnScope<T>()(routine, options.operation);
       });
 
