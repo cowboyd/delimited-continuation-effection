@@ -14,7 +14,7 @@ export interface Scope {
   get<T>(context: Context<T>): T | undefined;
   set<T>(context: Context<T>, value: T): T;
   //run<T>(operation: () => Operation<T>): Task<T>;
-  // spawn<T>(operation: () => Operation<T>): Operation<Task<T>>;
+  spawn<T>(operation: () => Operation<T>): Operation<Task<T>>;
   eval<T>(operation: () => Operation<T>): Operation<T>;
 }
 

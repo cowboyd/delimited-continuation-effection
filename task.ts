@@ -62,28 +62,32 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   return [() => routine.next(Resume(Ok())), task];
 }
 
-const Children = createContext<Set<Task<unknown>>>("@effection/task.children");
+const Tasks = createContext<Set<Task<unknown>>>("@effection/tasks");
+
+export function* halt(tasks: Set<Task<unknown>>): Operation<void> {
+  let teardown = Ok();
+  while (tasks.size > 0) {
+    for (let child of [...tasks].reverse()) {
+      try {
+        yield* child.halt();
+      } catch (error) {
+        teardown = Err(error);
+      } finally {
+        tasks.delete(child);
+      }
+    }
+  }
+  if (!teardown.ok) {
+    throw teardown.error;
+  }
+}
 
 export function* taskBounds<T>(op: () => Operation<T>): Operation<T> {
-  let children = yield* Children.set(new Set());
+  let tasks = yield* Tasks.set(new Set());
   try {
     return yield* op();
   } finally {
-    let teardown = Ok();
-    while (children.size > 0) {
-      for (let child of [...children].reverse()) {
-        try {
-          yield* child.halt();
-        } catch (error) {
-          teardown = Err(error);
-        } finally {
-          children.delete(child);
-        }
-      }
-    }
-    if (!teardown.ok) {
-      throw teardown.error;
-    }
+    yield* halt(tasks);
   }
 }
 

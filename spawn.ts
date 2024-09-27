@@ -5,19 +5,20 @@ import { Err, Ok } from "./result.ts";
 import { createTask } from "./task.ts";
 import { createScope } from "./scope.ts";
 
-const Children = createContext<Set<Task<unknown>>>("@effection/task.children");
+export const Tasks = createContext<Set<Task<unknown>>>("@effection/tasks");
 
 export function spawn<T>(op: () => Operation<T>): Operation<Task<T>> {
   return {
     *[Symbol.iterator]() {
       let task = yield Do((routine) => {
-        let children = routine.scope.get(Children);
+        let children = routine.scope.get(Tasks);
         if (!children) {
           routine.next(Resume(Err(new Error(`no children found!!`))));
           return;
         }
+        let [scope] = createScope(routine.scope);
         let [start, task] = createTask({
-          scope: createScope(routine.scope),
+          scope,
           operation: function* child() {
             try {
               return yield* op();

@@ -1,7 +1,10 @@
 import { useCoroutine } from "./coroutine.ts";
-import type { Context, Operation, Scope } from "./types.ts";
+import { run } from "./run.ts";
+import { spawn, Tasks } from "./spawn.ts";
+import { halt } from "./task.ts";
+import type { Context, Operation, Scope, Task } from "./types.ts";
 
-export function createScope(parent?: Scope): Scope {
+export function createScope(parent?: Scope): [Scope, () => Task<void>] {
   let contexts: Record<string, unknown> = parent
     ? Object.create(cast(parent).contexts)
     : {};
@@ -13,9 +16,9 @@ export function createScope(parent?: Scope): Scope {
     set<T>(context: Context<T>, value: T) {
       return contexts[context.name] = value;
     },
-    // run<T>(operation: () => Operation<T>): Task<T> {
-
-    // },
+    spawn<T>(operation: () => Operation<T>): Operation<Task<T>> {
+      return scope.eval(() => spawn(operation));
+    },
     *eval<T>(operation: () => Operation<T>): Operation<T> {
       let routine = yield* useCoroutine();
       let originalScope = routine.scope;
@@ -29,7 +32,9 @@ export function createScope(parent?: Scope): Scope {
     contexts,
   } as Scope;
 
-  return scope;
+  let tasks = scope.set(Tasks, new Set());
+
+  return [scope, () => run(() => halt(tasks))];
 }
 
 export function* useScope(): Operation<Scope> {
