@@ -31,3 +31,23 @@ export function createFutureWithResolvers<T>(): FutureWithResolvers<T> {
     },
   };
 }
+
+export function doAndWait<T>(also: () => void, future: Future<T>): Future<T> {
+  return {
+    [Symbol.toStringTag]: "Future",
+    *[Symbol.iterator]() {
+      also();
+      return yield* future;
+    },
+    then: (fn, ...args) => {
+      also();
+      if (fn) {
+        return future.then((...x) => fn(...x), ...args);
+      } else {
+        return future.then(fn, ...args);
+      }
+    },
+    catch: (...args) => future.catch(...args),
+    finally: (...args) => future.catch(...args),
+  } as Future<T>;
+}
