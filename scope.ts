@@ -18,10 +18,10 @@ export function createScope(parent?: Scope): [Scope, () => Task<void>] {
     },
     expect<T>(context: Context<T>): T {
       let value = scope.get(context);
-      if (typeof value === 'undefined') {
-	let error = new Error(context.name);
-	error.name = `MissingContextError`;
-	throw error;
+      if (typeof value === "undefined") {
+        let error = new Error(context.name);
+        error.name = `MissingContextError`;
+        throw error;
       }
       return value;
     },

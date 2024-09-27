@@ -2,7 +2,10 @@ import { constant } from "./constant.ts";
 import { action } from "./action.ts";
 import { Operation } from "./types.ts";
 
-export interface Callable<T extends Operation<unknown> | Promise<unknown> | unknown, TArgs extends unknown[] = []> {
+export interface Callable<
+  T extends Operation<unknown> | Promise<unknown> | unknown,
+  TArgs extends unknown[] = [],
+> {
   (...args: TArgs): T;
 }
 
@@ -12,9 +15,12 @@ export function call<T, TArgs extends unknown[] = []>(
 ): Operation<T> {
   return {
     [Symbol.iterator]() {
-      let target = callable.call(void(0), ...args);
-      if (typeof target === 'string' || Array.isArray(target) || target instanceof Map || target instanceof Set) {
-	return constant(target)[Symbol.iterator]();
+      let target = callable.call(void (0), ...args);
+      if (
+        typeof target === "string" || Array.isArray(target) ||
+        target instanceof Map || target instanceof Set
+      ) {
+        return constant(target)[Symbol.iterator]();
       } else if (isPromise<T>(target)) {
         return action<T>((resolve, reject) => {
           target.then(resolve, reject);
@@ -27,7 +33,8 @@ export function call<T, TArgs extends unknown[] = []>(
       }
     },
   };
-}1
+}
+1;
 
 function isPromise<T>(
   target: Operation<T> | Promise<T> | T,

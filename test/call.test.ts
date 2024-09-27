@@ -1,6 +1,6 @@
 import { describe, expect, it } from "./suite.ts";
 
-import { call, run, spawn, suspend } from "../mod.ts";
+import { call, run } from "../mod.ts";
 
 describe("call", () => {
   it("evaluates an operation function", async () => {

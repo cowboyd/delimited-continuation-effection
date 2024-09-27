@@ -13,9 +13,8 @@ export function action<T>(resolver: Resolver<T>): Operation<T> {
       try {
         let value = yield Do(({ next }) => {
           let settle = (result: Result<unknown>) => {
-	    settle = () => {};
+            settle = () => {};
             next(Resume(result));
-
           };
           let resolve = (value: unknown) => settle(Ok(value));
           let reject = (error: Error) => settle(Err(error));
