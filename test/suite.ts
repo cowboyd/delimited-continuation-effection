@@ -1,4 +1,4 @@
-import { Operation, suspend } from "../mod.ts";
+import { action, Operation } from "../mod.ts";
 import { sleep } from "../sleep.ts";
 
 export { describe, it } from "https://deno.land/std@0.223.0/testing/bdd.ts";
@@ -20,7 +20,7 @@ declare global {
 
 Object.defineProperty(Promise.prototype, Symbol.iterator, {
   get<T>(this: Promise<T>) {
-    let suspense = suspend<T>((resolve, reject) => {
+    let suspense = action<T>((resolve, reject) => {
       this.then(resolve, reject);
       return () => {};
     });

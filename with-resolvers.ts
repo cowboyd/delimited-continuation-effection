@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "./result.ts";
-import { suspend } from "./suspend.ts";
+import { action } from "./action.ts";
 import type { Operation, Resolve } from "./types.ts";
 
 export interface WithResolvers<T> {
@@ -12,7 +12,7 @@ export function withResolvers<T>(): WithResolvers<T> {
   let continuations = new Set<Resolve<Result<T>>>();
   let result: Result<T> | undefined = undefined;
 
-  let operation: Operation<T> = suspend<T>((resolve, reject) => {
+  let operation: Operation<T> = action<T>((resolve, reject) => {
     let settle = (outcome: Result<T>) => {
       if (outcome.ok) {
         resolve(outcome.value);

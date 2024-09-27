@@ -1,5 +1,5 @@
 import { blowUp, createNumber, describe, expect, it } from "./suite.ts";
-import { run, sleep, spawn, suspend, Task } from "../mod.ts";
+import { action, run, sleep, spawn, suspend, Task } from "../mod.ts";
 
 describe("run()", () => {
   it("can run an operation", async () => {
@@ -246,7 +246,7 @@ describe("run()", () => {
   it("handles error in entering suspend point", async () => {
     let error = new Error("boom!");
     let task = run(function* () {
-      yield* suspend(() => {
+      yield* action(() => {
         throw error;
       });
     });
@@ -257,7 +257,7 @@ describe("run()", () => {
   it("handles errors in exiting suspend points", async () => {
     let error = new Error("boom!");
     let task = run(function* () {
-      yield* suspend(() => () => {
+      yield* action(() => () => {
         throw error;
       });
     });
