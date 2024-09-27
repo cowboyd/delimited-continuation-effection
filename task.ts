@@ -1,9 +1,10 @@
 import { createContext } from "./context.ts";
+import { Routine } from "./contexts.ts";
 import { Do, Resume } from "./control.ts";
 import { controlBounds, createCoroutine } from "./coroutine.ts";
 import { createFutureWithResolvers, doAndWait } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Operation, Scope, Task } from "./types.ts";
+import { Coroutine, Operation, Scope, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
   operation(): Operation<T>;
@@ -37,6 +38,8 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   }
 
   let routine = createCoroutine({ name, operation, scope });
+
+  scope.set(Routine, routine);
 
   let halt_i = Do(() => {
     if (!halted) {
