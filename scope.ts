@@ -16,6 +16,15 @@ export function createScope(parent?: Scope): [Scope, () => Task<void>] {
     set<T>(context: Context<T>, value: T) {
       return contexts[context.name] = value;
     },
+    expect<T>(context: Context<T>): T {
+      let value = scope.get(context);
+      if (typeof value === 'undefined') {
+	let error = new Error(context.name);
+	error.name = `MissingContextError`;
+	throw error;
+      }
+      return value;
+    },
     spawn<T>(operation: () => Operation<T>): Operation<Task<T>> {
       return scope.eval(() => spawn(operation));
     },

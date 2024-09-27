@@ -31,7 +31,6 @@ export function spawn<T>(op: () => Operation<T>): Operation<Task<T>> {
               }
             }
           },
-          reduce: routine.reduce,
         });
         children.add(task);
         routine.next(Resume(Ok(task)));

@@ -13,6 +13,7 @@ export interface Task<T> extends Future<T> {
 export interface Scope {
   get<T>(context: Context<T>): T | undefined;
   set<T>(context: Context<T>, value: T): T;
+  expect<T>(context: Context<T>): T;
   //run<T>(operation: () => Operation<T>): Task<T>;
   spawn<T>(operation: () => Operation<T>): Operation<Task<T>>;
   eval<T>(operation: () => Operation<T>): Operation<T>;
@@ -32,7 +33,6 @@ export interface Coroutine<T = unknown> {
     setExitWith(instruction: Instruction): Instruction;
   };
   instructions(): Iterator<Instruction, T, unknown>;
-  reduce(routine: Coroutine, instruction: Instruction): void;
   next<I>(instruction: Instruction): void;
 }
 

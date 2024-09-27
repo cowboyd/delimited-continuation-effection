@@ -1,18 +1,17 @@
 import { createContext } from "./context.ts";
-import { Do, Instruction, Resume } from "./control.ts";
+import { Do, Resume } from "./control.ts";
 import { controlBounds, createCoroutine } from "./coroutine.ts";
 import { createFutureWithResolvers, doAndWait } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Coroutine, Operation, Scope, Task } from "./types.ts";
+import { Operation, Scope, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
   operation(): Operation<T>;
-  reduce?(routine: Coroutine, instruction: Instruction): void;
   scope: Scope;
 }
 
 export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
-  let { reduce, scope, operation: { name } } = options;
+  let { scope, operation: { name } } = options;
   let result = createFutureWithResolvers<T>();
   let finalized = createFutureWithResolvers<void>();
 
@@ -37,7 +36,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
     }
   }
 
-  let routine = createCoroutine({ name, operation, reduce, scope });
+  let routine = createCoroutine({ name, operation, scope });
 
   let halt_i = Do(() => {
     if (!halted) {
