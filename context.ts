@@ -31,6 +31,7 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   return context;
 }
 
+//TODO, we should not create new tasks per scope.
 export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
   let scope = yield* useScope();
   let [child] = createScope(scope);
