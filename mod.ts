@@ -1,4 +1,5 @@
-export * from "./types.ts";
+export type * from "./types.ts";
+export * from "./call.ts";
 export * from "./scope.ts";
 export * from "./sleep.ts";
 export * from "./suspend.ts";
