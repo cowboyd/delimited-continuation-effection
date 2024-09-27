@@ -1,10 +1,10 @@
 import { useCoroutine } from "./coroutine.ts";
-import { Do, Break, Resume } from "./control.ts";
+import { Break, Do, Resume } from "./control.ts";
 import { Routine } from "./contexts.ts";
-import { Ok, Err } from "./result.ts";
+import { Err, Ok } from "./result.ts";
 import { run } from "./run.ts";
 import { Tasks } from "./spawn.ts";
-import { halt, createTask } from "./task.ts";
+import { createTask, halt } from "./task.ts";
 import type { Context, Operation, Scope, Task } from "./types.ts";
 
 export function createScope(parent?: Scope): [Scope, () => Task<void>] {
@@ -29,35 +29,35 @@ export function createScope(parent?: Scope): [Scope, () => Task<void>] {
       return value;
     },
     *spawn<T>(operation: () => Operation<T>): Operation<Task<T>> {
-      let task = yield Do((routine) => {
-        let children = scope.get(Tasks);
-        if (!children) {
-          routine.next(Resume(Err(new Error(`no children found!!`))));
-          return;
-        }
-        let [child] = createScope(scope);
-        let [start, task] = createTask({
-          scope: child,
-          operation: function* child() {
-            try {
-              return yield* operation();
-            } catch (error) {
-              scope.get(Routine)?.next(Break(Resume(Err(error))));
-              throw error;
-            } finally {
-              if (typeof task !== "undefined") {
-                children.delete(task);
-              }
-            }
-          },
-        });
-        children.add(task);
-        routine.next(Resume(Ok(task)));
-        start();
-      });
+      let task = yield Do((routine) =>
+        routine.next(Resume(Ok(scope.run(operation))))
+      );
 
       return task as Task<T>;
     },
+    run<T>(operation: () => Operation<T>): Task<T> {
+      let children = scope.expect(Tasks);
+      let [child] = createScope(scope);
+      let [start, task] = createTask({
+        scope: child,
+        operation: function* child() {
+          try {
+            return yield* operation();
+          } catch (error) {
+            scope.get(Routine)?.next(Break(Resume(Err(error))));
+            throw error;
+          } finally {
+            if (typeof task !== "undefined") {
+              children.delete(task);
+            }
+          }
+        },
+      });
+      children.add(task);
+      start();
+      return task;
+    },
+
     *eval<T>(operation: () => Operation<T>): Operation<T> {
       let routine = yield* useCoroutine();
       let originalScope = routine.scope;
