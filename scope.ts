@@ -48,12 +48,13 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     run<T>(operation: () => Operation<T>): Task<T> {
       let children = TaskGroup.expect(scope);
       let [child] = createScope(scope);
+      let grandchildren = TaskGroup.expect(child);
 
       let [start, task] = createTask({
         scope: child,
         *operation() {
-          return yield* controlBounds(() =>
-            TaskGroup.encapsulate(function* child() {
+          return yield* controlBounds(function* () {
+	    return yield* TaskGroup.context.with(grandchildren, function* () {
               try {
                 return yield* operation();
               } catch (error) {
@@ -63,9 +64,10 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
                 if (typeof task !== "undefined") {
                   children.delete(task);
                 }
+		yield* grandchildren.halt();
               }
-            })
-          );
+	    });
+          });
         },
       });
       children.add(task);

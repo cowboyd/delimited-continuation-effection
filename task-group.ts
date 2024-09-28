@@ -5,6 +5,8 @@ import { Operation, Scope, Task } from "./types.ts";
 const Tasks = createContext<TaskGroup>("@effection/tasks");
 
 export class TaskGroup {
+  static context = Tasks;
+
   static create(scope: Scope): TaskGroup {
     return scope.set(Tasks, new TaskGroup());
   }
@@ -33,7 +35,7 @@ export class TaskGroup {
     return this.tasks.delete(task);
   }
 
-  *halt() {
+  *halt(): Operation<void> {
     let { tasks } = this;
     let teardown = Ok();
     while (tasks.size > 0) {
