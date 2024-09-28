@@ -20,9 +20,7 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
 
   function* operation(): Operation<void> {
     try {
-      let value = yield* controlBounds<T>(() =>
-        taskBounds<T>(options.operation)
-      );
+      let value = yield* options.operation();
       if (!halted) {
         result.resolve(value);
       }
