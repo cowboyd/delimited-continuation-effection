@@ -2,12 +2,17 @@ import { useCoroutine } from "./coroutine.ts";
 import { Break, Do, Resume } from "./control.ts";
 import { Routine } from "./contexts.ts";
 import { Err, Ok } from "./result.ts";
-import { run } from "./run.ts";
 import { Tasks } from "./spawn.ts";
 import { createTask, halt } from "./task.ts";
 import type { Context, Operation, Scope, Task } from "./types.ts";
 
-export function createScope(parent?: Scope): [Scope, () => Task<void>] {
+export const [global] = createScopeInternal();
+
+export function createScope(parent = global) {
+  return createScopeInternal(parent);
+}
+
+function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
   let contexts: Record<string, unknown> = parent
     ? Object.create(cast(parent).contexts)
     : {};
@@ -36,7 +41,7 @@ export function createScope(parent?: Scope): [Scope, () => Task<void>] {
       return task as Task<T>;
     },
     run<T>(operation: () => Operation<T>): Task<T> {
-      let children = scope.expect(Tasks);
+      let children = scope.get(Tasks) ?? scope.set(Tasks, new Set());
       let [child] = createScope(scope);
       let [start, task] = createTask({
         scope: child,
@@ -71,14 +76,26 @@ export function createScope(parent?: Scope): [Scope, () => Task<void>] {
     contexts,
   } as Scope;
 
-  let tasks = scope.set(Tasks, new Set());
+  scope.set(Tasks, new Set());
 
-  return [scope, () => run(() => halt(tasks))];
+  return [scope, () => parent!.run(() => halt(scope.expect(Tasks)))];
 }
 
 export function* useScope(): Operation<Scope> {
   let routine = yield* useCoroutine();
   return routine.scope;
+}
+
+//TODO, we should not create new tasks per scope.
+// also where to put this. name could be better too.
+export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
+  let scope = yield* useScope();
+  let [child, destroy] = createScope(scope);
+  try {
+    return yield* child.eval(op);
+  } finally {
+    yield* destroy();
+  }
 }
 
 function cast(scope: Scope): Scope & { contexts: Record<string, unknown> } {

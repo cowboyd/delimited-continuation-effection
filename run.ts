@@ -1,10 +1,3 @@
-import { createScope } from "./scope.ts";
-import { createTask } from "./task.ts";
-import { Operation, Task } from "./types.ts";
+import { global } from "./scope.ts";
 
-export function run<T>(operation: () => Operation<T>): Task<T> {
-  let [scope] = createScope();
-  let [start, task] = createTask<T>({ operation, scope });
-  start();
-  return task;
-}
+export const { run } = global;

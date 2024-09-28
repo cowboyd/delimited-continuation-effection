@@ -4,7 +4,7 @@ import { Do, Resume } from "./control.ts";
 import { controlBounds, createCoroutine } from "./coroutine.ts";
 import { createFutureWithResolvers, doAndWait } from "./future.ts";
 import { Err, Ok } from "./result.ts";
-import { Coroutine, Operation, Scope, Task } from "./types.ts";
+import { Operation, Scope, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
   operation(): Operation<T>;

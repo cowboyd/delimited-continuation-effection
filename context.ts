@@ -1,7 +1,6 @@
 import { Context, Operation } from "./types.ts";
 import { Do, Resume } from "./control.ts";
 import { Ok } from "./result.ts";
-import { createScope, useScope } from "./scope.ts";
 
 export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   let context: Context<T> = { name, get, set, expect, defaultValue };
@@ -29,11 +28,4 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
   }
 
   return context;
-}
-
-//TODO, we should not create new tasks per scope.
-export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
-  let scope = yield* useScope();
-  let [child] = createScope(scope);
-  return yield* child.eval(op);
 }

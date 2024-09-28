@@ -1,4 +1,4 @@
-import { contextBounds } from "./context.ts";
+import { contextBounds } from "./scope.ts";
 import { controlBounds } from "./coroutine.ts";
 import { taskBounds } from "./task.ts";
 import { Operation } from "./types.ts";
