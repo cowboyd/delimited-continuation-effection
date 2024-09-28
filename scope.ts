@@ -2,8 +2,8 @@ import { controlBounds, useCoroutine } from "./coroutine.ts";
 import { Break, Do, Resume } from "./control.ts";
 import { Routine } from "./contexts.ts";
 import { Err, Ok } from "./result.ts";
-import { Tasks } from "./spawn.ts";
-import { createTask, halt } from "./task.ts";
+
+import { createTask } from "./task.ts";
 import type { Context, Operation, Scope, Task } from "./types.ts";
 import { createFutureWithResolvers } from "./future.ts";
 import { TaskGroup } from "./task-group.ts";
@@ -46,7 +46,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
       return task as Task<T>;
     },
     run<T>(operation: () => Operation<T>): Task<T> {
-      let children = scope.get(Tasks) ?? scope.set(Tasks, new Set());
+      let children = TaskGroup.expect(scope);
       let [child] = createScope(scope);
 
       let [start, task] = createTask({
@@ -86,9 +86,9 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     contexts,
   } as Scope;
 
-  scope.set(Tasks, new Set());
+  let tasks = TaskGroup.create(scope);
 
-  return [scope, () => parent!.run(() => halt(scope.expect(Tasks)))];
+  return [scope, () => parent!.run(() => tasks.halt())];
 }
 
 export function* useScope(): Operation<Scope> {

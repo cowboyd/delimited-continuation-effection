@@ -1,9 +1,8 @@
-import { createContext } from "./context.ts";
 import { Routine } from "./contexts.ts";
 import { Do, Resume } from "./control.ts";
-import { controlBounds, createCoroutine } from "./coroutine.ts";
+import { createCoroutine } from "./coroutine.ts";
 import { createFutureWithResolvers, doAndWait } from "./future.ts";
-import { Err, Ok } from "./result.ts";
+import { Ok } from "./result.ts";
 import { Operation, Scope, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
@@ -60,33 +59,4 @@ export function createTask<T>(options: TaskOptions<T>): [() => void, Task<T>] {
   });
 
   return [() => routine.next(Resume(Ok())), task];
-}
-
-const Tasks = createContext<Set<Task<unknown>>>("@effection/tasks");
-
-export function* halt(tasks: Set<Task<unknown>>): Operation<void> {
-  let teardown = Ok();
-  while (tasks.size > 0) {
-    for (let child of [...tasks].reverse()) {
-      try {
-        yield* child.halt();
-      } catch (error) {
-        teardown = Err(error);
-      } finally {
-        tasks.delete(child);
-      }
-    }
-  }
-  if (!teardown.ok) {
-    throw teardown.error;
-  }
-}
-
-export function* taskBounds<T>(op: () => Operation<T>): Operation<T> {
-  let tasks = yield* Tasks.set(new Set());
-  try {
-    return yield* op();
-  } finally {
-    yield* halt(tasks);
-  }
 }

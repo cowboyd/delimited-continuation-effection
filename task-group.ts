@@ -1,10 +1,18 @@
 import { createContext } from "./context.ts";
 import { Err, Ok } from "./result.ts";
-import { Operation, Task } from "./types.ts";
+import { Operation, Scope, Task } from "./types.ts";
 
 const Tasks = createContext<TaskGroup>("@effection/tasks");
 
 export class TaskGroup {
+  static create(scope: Scope): TaskGroup {
+    return scope.set(Tasks, new TaskGroup());
+  }
+
+  static expect(scope: Scope): TaskGroup {
+    return scope.expect(Tasks);
+  }
+
   static *encapsulate<T>(operation: () => Operation<T>): Operation<T> {
     let original = yield* Tasks.get();
     let tasks = yield* Tasks.set(new TaskGroup());
