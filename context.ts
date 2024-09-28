@@ -30,6 +30,18 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
         next(Resume(Ok(scope.delete(context))))
       )) as boolean;
     },
+    *with<R>(value: T, operation: (value: T) => Operation<R>): Operation<R> {
+      let original = yield* context.get();
+      try {
+        return yield* operation(yield* context.set(value));
+      } finally {
+        if (typeof original === "undefined") {
+          yield* context.delete();
+        } else {
+          yield* context.set(original);
+        }
+      }
+    },
   };
 
   return context;

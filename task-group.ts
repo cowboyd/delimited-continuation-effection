@@ -13,19 +13,14 @@ export class TaskGroup {
     return scope.expect(Tasks);
   }
 
-  static *encapsulate<T>(operation: () => Operation<T>): Operation<T> {
-    let original = yield* Tasks.get();
-    let tasks = yield* Tasks.set(new TaskGroup());
-    try {
-      return yield* operation();
-    } finally {
-      if (original) {
-        yield* Tasks.set(original);
-      } else {
-        yield* Tasks.delete();
+  static encapsulate<T>(operation: () => Operation<T>): Operation<T> {
+    return Tasks.with(new TaskGroup(), function* (tasks) {
+      try {
+        return yield* operation();
+      } finally {
+        yield* tasks.halt();
       }
-      yield* tasks.halt();
-    }
+    });
   }
 
   tasks: Set<Task<unknown>> = new Set();

@@ -44,6 +44,7 @@ export interface Context<T> {
   set(value: T): Operation<T>;
   expect(): Operation<T>;
   delete(): Operation<boolean>;
+  with<R>(value: T, opperation: (value: T) => Operation<R>): Operation<R>;
 }
 
 export type Resolve<T> = (value: T) => void;
