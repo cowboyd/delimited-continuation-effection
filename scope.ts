@@ -16,7 +16,7 @@ export function createScope(parent = global) {
 function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
   let contexts: Record<string, unknown> = parent
     ? Object.create(cast(parent).contexts)
-    : {};
+    : Object.create(null);
 
   let scope = {
     get<T>(context: Context<T>) {
@@ -25,8 +25,11 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     set<T>(context: Context<T>, value: T) {
       return contexts[context.name] = value;
     },
-    delete<T>(context: Context<T>) {
+    delete(context) {
       return delete contexts[context.name];
+    },
+    hasOwn(context) {
+      return !!Reflect.getOwnPropertyDescriptor(context, context.name);
     },
     expect<T>(context: Context<T>): T {
       let value = scope.get(context);
