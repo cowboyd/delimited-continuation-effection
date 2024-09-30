@@ -134,6 +134,24 @@ describe("Scope", () => {
     });
     await expect(result).rejects.toBe(error);
   });
+
+  it("destroys derived scopes when a scope is destroyed", async () => {
+    let [parent, destroy] = createScope();
+    let [child] = createScope(parent);
+
+    let halted = false;
+
+    child.run(function* () {
+      try {
+        yield* suspend();
+      } finally {
+        halted = true;
+      }
+    });
+
+    await destroy();
+    expect(halted).toEqual(true);
+  });
 });
 
 interface Tester {
