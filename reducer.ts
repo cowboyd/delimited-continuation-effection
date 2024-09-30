@@ -16,42 +16,40 @@ export class Reducer {
       let item = queue.pop();
       while (item) {
         [routine, instruction] = item;
-        this.dispatch(routine, instruction);
+        const iterator = routine.instructions();
+
+        if (instruction.method === "resume") {
+          let result = instruction.result;
+          if (result.ok) {
+            let next = iterator.next(result.value);
+            if (!next.done) {
+              routine.next(next.value);
+            }
+          } else if (iterator.throw) {
+            let next = iterator.throw(result.error);
+            if (!next.done) {
+              routine.next(next.value);
+            }
+          } else {
+            throw result.error;
+          }
+        } else if (instruction.method === "break") {
+          routine.stack.setExitWith(instruction.instruction);
+
+          if (iterator.return) {
+            let next = iterator.return();
+            if (!next.done) {
+              routine.next(next.value);
+            }
+          }
+        } else if (instruction.method === "do") {
+          instruction.fn(routine);
+        }
+
         item = queue.pop();
       }
     } finally {
       this.reducing = false;
     }
   };
-
-  dispatch(routine: Coroutine, instruction: Instruction) {
-    const iterator = routine.instructions();
-    if (instruction.method === "resume") {
-      let result = instruction.result;
-      if (result.ok) {
-        let next = iterator.next(result.value);
-        if (!next.done) {
-          routine.next(next.value);
-        }
-      } else if (iterator.throw) {
-        let next = iterator.throw(result.error);
-        if (!next.done) {
-          routine.next(next.value);
-        }
-      } else {
-        throw result.error;
-      }
-    } else if (instruction.method === "break") {
-      routine.stack.setExitWith(instruction.instruction);
-
-      if (iterator.return) {
-        let next = iterator.return();
-        if (!next.done) {
-          routine.next(next.value);
-        }
-      }
-    } else if (instruction.method === "do") {
-      instruction.fn(routine);
-    }
-  }
 }
