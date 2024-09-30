@@ -1,5 +1,4 @@
-import { Done, Instruction } from "./control.ts";
-import { Err, Ok } from "./result.ts";
+import { Instruction } from "./control.ts";
 import { Coroutine } from "./types.ts";
 
 export class Reducer {
@@ -26,22 +25,17 @@ export class Reducer {
   };
 
   dispatch(routine: Coroutine, instruction: Instruction) {
-    try {
       const iterator = routine.instructions();
       if (instruction.method === "resume") {
         let result = instruction.result;
         if (result.ok) {
           let next = iterator.next(result.value);
-          if (next.done) {
-            routine.next(Done(Ok(next.value)));
-          } else {
+          if (!next.done) {
             routine.next(next.value);
-          }
+          } 
         } else if (iterator.throw) {
           let next = iterator.throw(result.error);
-          if (next.done) {
-            routine.next(Done(Ok(next.value)));
-          } else {
+          if (!next.done) {
             routine.next(next.value);
           }
         } else {
@@ -52,19 +46,13 @@ export class Reducer {
 
         if (iterator.return) {
           let next = iterator.return();
-          if (next.done) {
-            routine.next(Done(Ok(next.value)));
-          } else {
+          if (!next.done) {
             routine.next(next.value);
           }
-        } else {
-          routine.next(Done(Ok()));
         }
       } else if (instruction.method === "do") {
         instruction.fn(routine);
       }
-    } catch (error) {
-      routine.next(Done(Err(error)));
-    }
+
   }
 }
