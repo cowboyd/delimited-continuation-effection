@@ -5,7 +5,6 @@ import { Err, Ok } from "./result.ts";
 
 import { createTask } from "./task.ts";
 import type { Context, Operation, Scope, Task } from "./types.ts";
-import { createFutureWithResolvers } from "./future.ts";
 import { TaskGroup } from "./task-group.ts";
 
 export const [global] = createScopeInternal();
@@ -48,13 +47,12 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     run<T>(operation: () => Operation<T>): Task<T> {
       let children = TaskGroup.expect(scope);
       let [child] = createScope(scope);
-      let grandchildren = TaskGroup.expect(child);
+      let tasks = TaskGroup.expect(child);
 
-      let [start, task] = createTask({
+      let [task, routine] = createTask({
         scope: child,
         *operation() {
           return yield* controlBounds(function* () {
-	    return yield* TaskGroup.context.with(grandchildren, function* () {
               try {
                 return yield* operation();
               } catch (error) {
@@ -64,14 +62,13 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
                 if (typeof task !== "undefined") {
                   children.delete(task);
                 }
-		yield* grandchildren.halt();
+		yield* tasks.halt();
               }
-	    });
           });
         },
       });
       children.add(task);
-      start();
+      routine.next(Resume(Ok()));
       return task;
     },
 
@@ -113,54 +110,3 @@ export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
 function cast(scope: Scope): Scope & { contexts: Record<string, unknown> } {
   return scope as Scope & { contexts: Record<string, unknown> };
 }
-
-// let { scope, operation: { name } } = options;
-// let result = createFutureWithResolvers<T>();
-// let finalized = createFutureWithResolvers<void>();
-
-// let halted = false;
-
-// function* operation(): Operation<void> {
-//   try {
-//     let value = yield* controlBounds<T>(() =>
-//       taskBounds<T>(options.operation)
-//     );
-//     if (!halted) {
-//       result.resolve(value);
-//     }
-//   } catch (error) {
-//     result.reject(error);
-//     finalized.reject(error);
-//   } finally {
-//     finalized.resolve();
-//     if (halted) {
-//       result.reject(new Error("halted"));
-//     }
-//   }
-// }
-
-// let routine = createCoroutine({ name, operation, scope });
-
-// scope.set(Routine, routine);
-
-// let halt_i = Do(() => {
-//   if (!halted) {
-//     halted = true;
-//     routine.next(routine.stack.haltInstruction);
-//   }
-// });
-
-// let halt = () => doAndWait(() => routine.next(halt_i), finalized.future);
-
-// let task: Task<T> = Object.create(result.future, {
-//   [Symbol.toStringTag]: {
-//     enumerable: false,
-//     value: "Task",
-//   },
-//   halt: {
-//     enumerable: false,
-//     value: halt,
-//   },
-// });
-
-// return [() => routine.next(Resume(Ok())), task];
