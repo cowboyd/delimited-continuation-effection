@@ -4,7 +4,7 @@ import { Operation } from "./types.ts";
 import { TaskGroup } from "./task-group.ts";
 
 export function scoped<T>(op: () => Operation<T>): Operation<T> {
-  return contextBounds<T>(() =>
-    controlBounds<T>(() => TaskGroup.encapsulate(op))
+  return TaskGroup.encapsulate(() =>
+    contextBounds<T>(() => controlBounds<T>(op))
   );
 }

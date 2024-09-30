@@ -5,13 +5,10 @@ import { Operation, Scope, Task } from "./types.ts";
 const Tasks = createContext<TaskGroup>("@effection/tasks");
 
 export class TaskGroup {
-  static context = Tasks;
-
-  static create(scope: Scope): TaskGroup {
-    return scope.set(Tasks, new TaskGroup());
-  }
-
-  static expect(scope: Scope): TaskGroup {
+  static ensureOwn(scope: Scope): TaskGroup {
+    if (!scope.hasOwn(Tasks)) {
+      scope.set(Tasks, new TaskGroup());
+    }
     return scope.expect(Tasks);
   }
 
@@ -23,6 +20,13 @@ export class TaskGroup {
         yield* tasks.halt();
       }
     });
+  }
+
+  static *halt(scope: Scope): Operation<void> {
+    if (scope.hasOwn(Tasks)) {
+      let tasks = scope.expect(Tasks);
+      yield* tasks.halt();
+    }
   }
 
   tasks: Set<Task<unknown>> = new Set();

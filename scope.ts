@@ -29,7 +29,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
       return delete contexts[context.name];
     },
     hasOwn(context) {
-      return !!Reflect.getOwnPropertyDescriptor(context, context.name);
+      return !!Reflect.getOwnPropertyDescriptor(contexts, context.name);
     },
     expect<T>(context: Context<T>): T {
       let value = scope.get(context);
@@ -48,9 +48,9 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
       return task as Task<T>;
     },
     run<T>(operation: () => Operation<T>): Task<T> {
-      let children = TaskGroup.expect(scope);
+      let children = TaskGroup.ensureOwn(scope);
+
       let [child] = createScope(scope);
-      let tasks = TaskGroup.expect(child);
 
       let [task, routine] = createTask({
         scope: child,
@@ -65,7 +65,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
               if (typeof task !== "undefined") {
                 children.delete(task);
               }
-              yield* tasks.halt();
+              yield* TaskGroup.halt(child);
             }
           });
         },
@@ -88,9 +88,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     contexts,
   } as Scope;
 
-  let tasks = TaskGroup.create(scope);
-
-  return [scope, () => parent!.run(() => tasks.halt())];
+  return [scope, () => parent!.run(() => TaskGroup.halt(scope))];
 }
 
 export function* useScope(): Operation<Scope> {
@@ -98,8 +96,6 @@ export function* useScope(): Operation<Scope> {
   return routine.scope;
 }
 
-//TODO, we should not create new tasks per scope.
-// also where to put this. name could be better too.
 export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
   let scope = yield* useScope();
   let [child, destroy] = createScope(scope);
