@@ -9,11 +9,12 @@ import { TaskGroup } from "./task-group.ts";
 
 export const [global] = createScopeInternal();
 
-export function createScope(parent = global) {
-  return createScopeInternal(parent);
+export function createScope(parent = global): [Scope, () => Task<void>] {
+  let [scope, destroy] = createScopeInternal(parent);
+  return [scope, () => parent.run(destroy)];
 }
 
-function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
+function createScopeInternal(parent?: Scope): [Scope, () => Operation<void>] {
   let contexts: Record<string, unknown> = parent
     ? Object.create(cast(parent).contexts)
     : Object.create(null);
@@ -50,7 +51,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     run<T>(operation: () => Operation<T>): Task<T> {
       let children = TaskGroup.ensureOwn(scope);
 
-      let [child] = createScope(scope);
+      let [child, destroy] = createScopeInternal(scope);
 
       let [task, routine] = createTask({
         scope: child,
@@ -65,7 +66,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
               if (typeof task !== "undefined") {
                 children.delete(task);
               }
-              yield* TaskGroup.halt(child);
+              yield* destroy();
             }
           });
         },
@@ -88,7 +89,7 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
     contexts,
   } as Scope;
 
-  return [scope, () => parent!.run(() => TaskGroup.halt(scope))];
+  return [scope, () => TaskGroup.halt(scope)];
 }
 
 export function* useScope(): Operation<Scope> {
