@@ -53,17 +53,17 @@ function createScopeInternal(parent?: Scope): [Scope, () => Task<void>] {
         scope: child,
         *operation() {
           return yield* controlBounds(function* () {
-              try {
-                return yield* operation();
-              } catch (error) {
-                scope.get(Routine)?.next(Break(Resume(Err(error))));
-                throw error;
-              } finally {
-                if (typeof task !== "undefined") {
-                  children.delete(task);
-                }
-		yield* tasks.halt();
+            try {
+              return yield* operation();
+            } catch (error) {
+              scope.get(Routine)?.next(Break(Resume(Err(error))));
+              throw error;
+            } finally {
+              if (typeof task !== "undefined") {
+                children.delete(task);
               }
+              yield* tasks.halt();
+            }
           });
         },
       });

@@ -20,30 +20,31 @@ export function createTask<T>(options: TaskOptions<T>): [Task<T>, Coroutine] {
     scope,
     *operation() {
       try {
-	let value = yield* options.operation();
-	if (!halted) {
+        let value = yield* options.operation();
+        if (!halted) {
           result.resolve(value);
-	}
+        }
       } catch (error) {
-	result.reject(error);
-	finalized.reject(error);
+        result.reject(error);
+        finalized.reject(error);
       } finally {
-	finalized.resolve();
-	if (halted) {
+        finalized.resolve();
+        if (halted) {
           result.reject(new Error("halted"));
-	}
+        }
       }
     },
   });
 
   scope.set(Routine, routine);
 
-  let halt = () => doAndWait(() => {
-    if (!halted) {
-      halted = true;
-      routine.next(routine.stack.haltInstruction);
-    }
-  }, finalized.future);
+  let halt = () =>
+    doAndWait(() => {
+      if (!halted) {
+        halted = true;
+        routine.next(routine.stack.haltInstruction);
+      }
+    }, finalized.future);
 
   let task: Task<T> = Object.create(result.future, {
     [Symbol.toStringTag]: {
