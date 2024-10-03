@@ -1,6 +1,9 @@
-import { Operation, Task } from "./types.ts";
-import { useScope } from "./scope.ts";
-
+import type { Operation, Scope, Task, Yielded } from "./types.ts";
+import { transfer, useScope } from "./scope.ts";
+import { scoped } from "./scoped.ts";
+import { spawn } from "./spawn.ts";
+import { withResolvers } from "./with-resolvers.ts";
+import { race } from "./race.ts";
 
 /**
  * Block and wait for all of the given operations to complete. Returns
@@ -30,12 +33,22 @@ import { useScope } from "./scope.ts";
 export function* all<T extends readonly Operation<unknown>[] | []>(
   ops: T,
 ): Operation<All<T>> {
-  let scope = yield* useScope();
+  let { operation: failure, reject: fail } = withResolvers<All<T>>();
 
-  return yield* scoped(function* () {
+  let evaluate = scoped(function* (): Operation<All<T>> {
     let tasks: Task<unknown>[] = [];
+
     for (let operation of ops) {
-      tasks.push(yield* spawn(() => scope.eval(() => operation)));
+      tasks.push(
+        yield* spawn(function* () {
+          try {
+            let value = yield* operation;
+            return value;
+          } catch (error) {
+            fail(error);
+          }
+        }),
+      );
     }
     let results = [];
     for (let task of tasks) {
@@ -43,6 +56,8 @@ export function* all<T extends readonly Operation<unknown>[] | []>(
     }
     return results as All<T>;
   });
+
+  return yield* race([failure, evaluate]);
 }
 
 /**

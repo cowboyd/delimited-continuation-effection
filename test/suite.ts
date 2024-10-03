@@ -1,4 +1,4 @@
-import { action, Operation } from "../mod.ts";
+import { action, Operation, resource, spawn } from "../mod.ts";
 import { sleep } from "../sleep.ts";
 
 export { describe, it } from "https://deno.land/std@0.223.0/testing/bdd.ts";
@@ -43,6 +43,21 @@ export function* asyncReject(
 ): Operation<string> {
   yield* sleep(duration);
   throw new Error(`boom: ${value}`);
+}
+
+export function asyncResource(
+  duration: number,
+  value: string,
+  status: { status: string },
+): Operation<string> {
+  return resource(function* AsyncResource(provide) {
+    yield* spawn(function* () {
+      yield* sleep(duration + 10);
+      status.status = "active";
+    });
+    yield* sleep(duration);
+    yield* provide(value);
+  });
 }
 
 export function* syncResolve(value: string): Operation<string> {

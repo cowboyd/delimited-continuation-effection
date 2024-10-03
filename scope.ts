@@ -121,7 +121,7 @@ export function* useScope(): Operation<Scope> {
 
 export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
   let scope = yield* useScope();
-  let [child, destroy] = createScope(scope);
+  let [child, destroy] = createScopeInternal(scope);
   try {
     return yield* child.eval(op);
   } finally {
@@ -132,7 +132,6 @@ export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
 function cast(scope: Scope): Scope & { contexts: Record<string, unknown> } {
   return scope as Scope & { contexts: Record<string, unknown> };
 }
-
 
 interface Transfer {
   from: Scope;
