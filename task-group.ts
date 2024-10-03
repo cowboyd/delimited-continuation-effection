@@ -5,21 +5,21 @@ import { Operation, Scope, Task } from "./types.ts";
 const Tasks = createContext<TaskGroup>("@effection/tasks");
 
 export class TaskGroup {
+  static transfer(from: Scope, to: Scope) {
+    let newSiblings = to.expect(Tasks);
+    let oldSiblings = from.expect(Tasks);
+
+    for (let task of oldSiblings.tasks) {
+      oldSiblings.tasks.delete(task);
+      newSiblings.tasks.add(task);
+    }
+  }
+
   static ensureOwn(scope: Scope): TaskGroup {
     if (!scope.hasOwn(Tasks)) {
       scope.set(Tasks, new TaskGroup());
     }
     return scope.expect(Tasks);
-  }
-
-  static encapsulate<T>(operation: () => Operation<T>): Operation<T> {
-    return Tasks.with(new TaskGroup(), function* (tasks) {
-      try {
-        return yield* operation();
-      } finally {
-        yield* tasks.halt();
-      }
-    });
   }
 
   static *halt(scope: Scope): Operation<void> {

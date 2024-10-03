@@ -8,3 +8,4 @@ export * from "./run.ts";
 export * from "./context.ts";
 export * from "./resource.ts";
 export * from "./action.ts";
+export * from "./race.ts";

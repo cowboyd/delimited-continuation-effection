@@ -1,6 +1,6 @@
 import { controlBounds, useCoroutine } from "./coroutine.ts";
 import { Break, Do, Resume } from "./control.ts";
-import { Routine, Scopes } from "./contexts.ts";
+import { Children, Parent, Routine } from "./contexts.ts";
 import { Err, Ok } from "./result.ts";
 
 import { createTask } from "./task.ts";
@@ -66,7 +66,11 @@ function createScopeInternal(parent?: Scope): [Scope, () => Operation<void>] {
               if (typeof task !== "undefined") {
                 tasks.delete(task);
               }
-              yield* destroy();
+              let parent = child.get(Parent);
+              let adopted = parent !== scope;
+              if (!adopted) {
+                yield* destroy();
+              }
             }
           });
         },
@@ -89,16 +93,20 @@ function createScopeInternal(parent?: Scope): [Scope, () => Operation<void>] {
     contexts,
   } as Scope;
 
-  let children = scope.set(Scopes, new Map());
+  scope.set(Children, new Map());
 
-  parent?.expect(Scopes).set(scope, destroy);
+  if (parent) {
+    scope.set(Parent, parent);
+    parent.expect(Children).set(scope, destroy);
+  }
+  parent?.expect(Children).set(scope, destroy);
 
   function* destroy(): Operation<void> {
-    parent?.expect(Scopes).delete(scope);
+    scope.expect(Parent).expect(Children).delete(scope);
     yield* TaskGroup.halt(scope);
 
-    for (let [child, destroy] of children) {
-      children.delete(child);
+    let children = scope.expect(Children);
+    for (let [, destroy] of children) {
       yield* destroy();
     }
   }
