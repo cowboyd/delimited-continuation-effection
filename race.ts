@@ -3,7 +3,7 @@ import { useScope } from "./scope.ts";
 import { scoped } from "./scoped.ts";
 import type { Operation, Yielded } from "./types.ts";
 import { withResolvers } from "./with-resolvers.ts";
-import { transfer } from "./transfer.ts";
+import { transfer } from "./scope.ts";
 import { Err, Ok, Result } from "./result.ts";
 
 export function* race<T extends Operation<unknown>>(
@@ -20,7 +20,7 @@ export function* race<T extends Operation<unknown>>(
         try {
           let value = yield* operation;
 
-	  // Transfer the winner to the contestant
+          // Transfer the winner to the contestant
           transfer({ from: contestant, to: caller });
           winner.resolve(Ok(value as Yielded<T>));
         } catch (error) {

@@ -104,4 +104,7 @@ describe("race()", () => {
       expect(state).toEqual({ name: "winner", status: "open" });
     });
   });
+
+  it.skip("doesn't adopt childless scopes", async () => {
+  });
 });

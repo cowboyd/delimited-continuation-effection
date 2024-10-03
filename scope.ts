@@ -132,3 +132,23 @@ export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
 function cast(scope: Scope): Scope & { contexts: Record<string, unknown> } {
   return scope as Scope & { contexts: Record<string, unknown> };
 }
+
+
+interface Transfer {
+  from: Scope;
+  to: Scope;
+}
+
+export function transfer({ from, to }: Transfer): void {
+  TaskGroup.transfer(from, to);
+
+  let toChildren = to.expect(Children);
+  let fromChildren = from.expect(Children);
+
+  for (let [child, destructor] of fromChildren) {
+    fromChildren.delete(child);
+    child.set(Parent, to);
+    toChildren.set(child, destructor);
+    Object.setPrototypeOf(cast(child).contexts, cast(to).contexts);
+  }
+}
