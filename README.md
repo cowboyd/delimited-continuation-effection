@@ -13,124 +13,13 @@ In Effection 3.0, there is one reduction queue per `Frame`, or rather each itera
 
 This also means not nearly as many runtime structures like event queues and futures which should improve baseline performance as previous versions were memory hogs.
 
-## Operation Delimiters
+## Reduced Instruction Set
 
-This introduces the idea of "delimiters" or stateful objects that exist at a specified point in a stack of operations and effect how those operations run. Delimiters are the things that handle the instructions that are yielded by an operation during its execution. Any delimiter can be wrapped around any operation with the `delimit()` function which takes a delimiter, and an operation and returns an operation.
+There are only three core instructions: "resume", "break", and "do". This means maximum composability. and it turns out that's all you need.
 
+## Scope everything
 
-```
-         ║                         
-┌────────╬────────┐◁──Delimiter────
-│        ║        │                
-│┌───────╬───────┐◁──Delimiter──── 
-││       ▼       ││                
-││  ┌─────────┐  ││                
-││  │Operation│  ││                
-││  │    A    │  ││                
-││  └─────────┘  ││                
-││       ║       ││                
-││       ▼       ││                
-││  ┌─────────┐  ││                
-││  │Operation│  ││                
-││  │    B    │  ││                
-││  └─────────┘  ││                
-││       ║       ││                
-││┌──────╬──────┐◁┼─Delimiter────  
-│││      ▼      │││                
-│││ ┌─────────┐ │││                
-│││ │Operation│ │││                
-│││ │    C    │ │││                
-│││ └─────────┘ │││                
-         ║                         
-         ║                         
-         ║                         
-         ▼                         
-```
-
-## Spawn Delimiter
-
-This _greatly_ simplifies how structured concurrency works since the mechanisms themselves are implemented as operations. For example, check out the `spawn()` delimiter which can be used in its raw form like this:
-
-```ts
-yield* delimit(spawnScope(), function*() {
-  let one = yield* spawn(function*() {
-    yield* sleep(100);
-    console.log('yawn one');
-  });
-  
-  let one = yield* spawn(function*() {
-    yield* sleep(300);
-    console.log('yawn two');
-  });
-  
-  yield* sleep(200);
-});
-```
-
-All of the tasks created with in the delimitation are destroyed at the
-end of it which means that the second task is never allowed to
-complete.
-
-The key points of the implementation are as follows.
-
-```ts
-export function spawnScope(): Delimiter<() => Operation<unknown>> {
-  // setup set of tasks at a specific point in the stack.
-  let tasks = new Set<Task<unknown>>();
-  return {
-    name: "@effection/spawn",
-
-    // handle spawns that happen within the scope of this delimiter
-    handle(instruction, routine) {
-      // create the child task and routine and add it to the task list
-      let [task, childRoutine] = createChildTask(instruction, routine);
-      tasks.add(task);
-	  
-      // continue the routine with the reference to the task
-      reduce(routine, Resume(Ok(task)));
-	  
-      // continue the childRoutine to begin task execution
-      reduce(childRoutine, Resume(Ok()));
-    },
-
-    // delimit a specified operation
-    *delimit(operation) {
-      try {
-        // run the operation
-        return yield* operation();
-      } finally {
-        // destroy all tasks in the set
-        while (tasks.size) {
-          for (let task of [...tasks].reverse()) {
-            tasks.delete(task);
-            yield* task.halt();
-          }
-        }
-      }
-    },
-  }
-}
-```
-
-This combination of allowing us to store state at a specific point in the call stack and then perform operations before and after is incredibly powerful. This is because there is _no concept of an absolute instruction set_. Instead, the instructions are simply those which have delimiters on the stack which are set up to handle them.
-
-## Control Delimiter
-
-We can see this in action by the fact that the iterator control itself is implemented as a delimiter. This allows us to localize control to a specific scope and associate an "exit" state with it, and this is how catching errors thrown externally to the iterator is achieved. When a spawned task within a control scope crashes it issues a "break" instruction with associated error on its parent. This instruction calls `return()` on the iterator, but also sets the exit state for the delimiter. Just before the delimiter is done, it throws the error inside the current iterator.
-
-Again, we have a state that is associated with a very specific point in the call stack and we can act upon with handlers during execution, and then also take actions at the boundaries.
-
-A halt is just a "break" instruction without an associated error.
-
-## Scoped
-
-The `scoped()` function we've been discussing then becomes a simple composition of delimiters:
-
-```ts
-function scoped<T>(op: () => Operation<T>): Operation<T> {
-  return delimit(controlScope(), () => delimit(spawnScope(), op));
-}
-```
+The core primitive in this version of the library really is the `Scope` and the `Context` which have been enhanced considerably. Also, scope is used to store the key runtime data structures of Effection itself which means that making an inspector will be much easier.
 
 ## Observations / Areas for exploration
 
@@ -141,6 +30,4 @@ function scoped<T>(op: () => Operation<T>): Operation<T> {
 
 ## TODO
 
-- [ ] clean up task implemenation 
-- [ ] resource delimiter
 - [ ] `star()` instruction for hoisting iterators
