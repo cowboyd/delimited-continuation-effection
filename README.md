@@ -28,6 +28,11 @@ The core primitive in this version of the library really is the `Scope` and the 
 - iterator hoisting can be accomplished easily by adding iterators to the stack, running them to exhaustion, and then popping them off when a `"done""` instruction is found.
 - string instruction names like "break" and "resume" are used for simplicity, but we could achieve some performance gain by using smi enum tags.
 
+## Preserve all() and race() resoures
+
+This is an experimental feature, but `race()` preserves any resources created in the contestant operation, the same may be possible for `all()`
+
 ## TODO
 
 - [ ] `star()` instruction for hoisting iterators
+- [ ] preserve resources created in `all()` member operations
