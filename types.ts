@@ -10,6 +10,10 @@ export interface Task<T> extends Future<T> {
   halt(): Future<void>;
 }
 
+export interface Subscription<T, TDone> {
+  next(): Operation<IteratorResult<T,TDone>>;
+}
+
 export interface Scope {
   get<T>(context: Context<T>): T | undefined;
   set<T>(context: Context<T>, value: T): T;
