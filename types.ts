@@ -11,7 +11,7 @@ export interface Task<T> extends Future<T> {
 }
 
 export interface Subscription<T, TDone> {
-  next(): Operation<IteratorResult<T,TDone>>;
+  next(): Operation<IteratorResult<T, TDone>>;
 }
 
 export interface Scope {

@@ -1,5 +1,4 @@
-import type { Operation, Scope, Task, Yielded } from "./types.ts";
-import { transfer, useScope } from "./scope.ts";
+import type { Operation, Task, Yielded } from "./types.ts";
 import { scoped } from "./scoped.ts";
 import { spawn } from "./spawn.ts";
 import { withResolvers } from "./with-resolvers.ts";
