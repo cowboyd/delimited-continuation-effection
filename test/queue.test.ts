@@ -1,11 +1,5 @@
 import { describe, expect, it } from "./suite.ts";
-import {
-  createQueue,
-  type Operation,
-  run,
-  sleep,
-  spawn,
-} from "../mod.ts";
+import { createQueue, type Operation, run, sleep, spawn } from "../mod.ts";
 import { race } from "../race.ts";
 
 describe("Queue", () => {
@@ -53,7 +47,6 @@ describe("Queue", () => {
 });
 
 function abortAfter<T>(op: Operation<T>, ms: number): Operation<T | void> {
-  
   // return action(function* (resolve, reject) {
   //   yield* spawn(function* () {
   //     try {
@@ -65,5 +58,5 @@ function abortAfter<T>(op: Operation<T>, ms: number): Operation<T | void> {
   //   yield* sleep(ms);
   //   resolve();
   // });
-  return race([op, sleep(ms)])
+  return race([op, sleep(ms)]);
 }
