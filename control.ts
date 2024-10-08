@@ -4,17 +4,7 @@ import { Coroutine } from "./types.ts";
 export type Instruction =
   | Resume
   | Break
-  | Done
   | Do;
-
-export interface Done {
-  method: "done";
-  result: Result<unknown>;
-}
-
-export function Done(result: Result<unknown>): Done {
-  return { method: "done", result };
-}
 
 export interface Resume {
   method: "resume";
