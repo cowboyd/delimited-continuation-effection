@@ -4,7 +4,7 @@ import { Do } from "./control.ts";
 export function suspend(): Operation<void> {
   return {
     *[Symbol.iterator]() {
-      yield Do(() => {});
+      yield Do(() => {}, "suspend");
     },
   };
 }

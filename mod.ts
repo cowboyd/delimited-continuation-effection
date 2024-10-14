@@ -11,3 +11,4 @@ export * from "./action.ts";
 export * from "./race.ts";
 export * from "./all.ts";
 export * from "./queue.ts";
+export * from "./lift.ts";

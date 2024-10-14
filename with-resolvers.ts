@@ -12,23 +12,25 @@ export function withResolvers<T>(): WithResolvers<T> {
   let continuations = new Set<Resolve<Result<T>>>();
   let result: Result<T> | undefined = undefined;
 
-  let operation: Operation<T> = action<T>((resolve, reject) => {
-    let settle = (outcome: Result<T>) => {
-      if (outcome.ok) {
-        resolve(outcome.value);
-      } else {
-        reject(outcome.error);
-      }
-    };
+  let operation: Operation<T> = action<T>(
+    function createResolver(resolve, reject) {
+      let settle = (outcome: Result<T>) => {
+        if (outcome.ok) {
+          resolve(outcome.value);
+        } else {
+          reject(outcome.error);
+        }
+      };
 
-    if (result) {
-      settle(result);
-      return () => {};
-    } else {
-      continuations.add(settle);
-      return () => continuations.delete(settle);
-    }
-  });
+      if (result) {
+        settle(result);
+        return () => {};
+      } else {
+        continuations.add(settle);
+        return () => continuations.delete(settle);
+      }
+    },
+  );
 
   let settle = (outcome: Result<T>) => {
     if (!result) {

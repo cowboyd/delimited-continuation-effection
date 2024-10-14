@@ -12,4 +12,6 @@ export const Parent = createContext<Scope>("@effection/scope.parent");
 
 export const Children = createContext<Children>("@effection/scope.children");
 
+export const Generation = createContext<number>("@effection/scope.generation");
+
 type Children = Map<Scope, () => Operation<void>>;

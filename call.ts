@@ -22,7 +22,7 @@ export function call<T, TArgs extends unknown[] = []>(
       ) {
         return constant(target)[Symbol.iterator]();
       } else if (isPromise<T>(target)) {
-        return action<T>((resolve, reject) => {
+        return action<T>(function wait(resolve, reject) {
           target.then(resolve, reject);
           return () => {};
         })[Symbol.iterator]();

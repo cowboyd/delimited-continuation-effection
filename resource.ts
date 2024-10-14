@@ -24,6 +24,6 @@ export function* resource<T>(
   return yield* controlBounds<T>(function* () {
     yield* spawn(() => op(provide));
 
-    return (yield Do(() => {})) as T;
+    return (yield Do(() => {}, "await resource")) as T;
   });
 }

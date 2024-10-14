@@ -30,6 +30,7 @@ export type Yielded<T extends Operation<unknown>> = T extends
   : never;
 
 export interface Coroutine<T = unknown> {
+  id: number;
   name: string;
   scope: Scope;
   stack: {

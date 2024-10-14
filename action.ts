@@ -23,7 +23,7 @@ export function action<T>(resolver: Resolver<T>): Operation<T> {
           } catch (error) {
             next(Resume(Err(error)));
           }
-        });
+        }, `action ${resolver.name}`);
         return value as T;
       } finally {
         exit();

@@ -21,8 +21,9 @@ declare global {
 
 Object.defineProperty(Promise.prototype, Symbol.iterator, {
   get<T>(this: Promise<T>) {
-    let suspense = action<T>((resolve, reject) => {
-      this.then(resolve, reject);
+    let promise = this;
+    let suspense = action<T>(function wait(resolve, reject) {
+      promise.then(resolve, reject);
       return () => {};
     });
     return suspense[Symbol.iterator];

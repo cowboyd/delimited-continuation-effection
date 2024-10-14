@@ -1,21 +1,29 @@
 import { Instruction } from "./control.ts";
+import { serialize } from "./serializable.ts";
 import { Coroutine } from "./types.ts";
 
 export class Reducer {
   reducing = false;
-  readonly queue: [Coroutine, Instruction][] = [];
+  readonly queue: [number, Coroutine, Instruction][] = [];
 
-  reduce = (routine: Coroutine, instruction: Instruction) => {
+  reduce = (routine: Coroutine, instruction: Instruction, priority: number) => {
     let { queue } = this;
-    queue.unshift([routine, instruction]);
+    logEnqueue([priority, routine, instruction], queue);
+    let index = queue.findIndex(([p]) => p > priority);
+    if (index === -1) {
+      queue.push([priority, routine, instruction]);
+    } else {
+      queue.splice(index, 0, [priority, routine, instruction]);
+    }
     if (this.reducing) return;
 
     try {
       this.reducing = true;
 
-      let item = queue.pop();
+      let item = queue.shift();
       while (item) {
-        [routine, instruction] = item;
+        log(item, queue);
+        [, routine, instruction] = item;
         const iterator = routine.instructions();
 
         if (instruction.method === "resume") {
@@ -46,10 +54,42 @@ export class Reducer {
           instruction.fn(routine);
         }
 
-        item = queue.pop();
+        item = queue.shift();
       }
     } finally {
       this.reducing = false;
     }
+  };
+}
+
+Deno.truncateSync("instruction.log");
+
+function log(thunk: Thunk, queue: Thunk[]) {
+  Deno.writeTextFileSync(
+    "instruction.log",
+    `${JSON.stringify(toJSON(thunk))} <-- ${
+      JSON.stringify(queue.map(toJSON))
+    }\n-------------\n`,
+    { append: true, create: true },
+  );
+}
+
+function logEnqueue(thunk: Thunk, queue: Thunk[]) {
+  Deno.writeTextFileSync(
+    "instruction.log",
+    `${JSON.stringify(toJSON(thunk))} --> ${
+      JSON.stringify(queue.map(toJSON))
+    }\n`,
+    { append: true, create: true },
+  );
+}
+
+type Thunk = [number, Coroutine, Instruction];
+
+function toJSON([p, routine, instruction]: Thunk) {
+  return {
+    p,
+    ...serialize(instruction) as object,
+    on: routine.id,
   };
 }

@@ -7,13 +7,15 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
     name,
     defaultValue,
     *get(): Operation<T | undefined> {
-      return (yield Do(({ next, scope }) =>
-        next(Resume(Ok(scope.get(context))))
+      return (yield Do(
+        ({ next, scope }) => next(Resume(Ok(scope.get(context)))),
+        `get(${name})`,
       )) as T | undefined;
     },
     *set(value: T): Operation<T> {
-      return (yield Do(({ next, scope }) =>
-        next(Resume(Ok(scope.set(context, value))))
+      return (yield Do(
+        ({ next, scope }) => next(Resume(Ok(scope.set(context, value)))),
+        `set(${name})`,
       )) as T;
     },
     *expect(): Operation<T> {
@@ -26,8 +28,9 @@ export function createContext<T>(name: string, defaultValue?: T): Context<T> {
       return value;
     },
     *delete(): Operation<boolean> {
-      return (yield Do(({ next, scope }) =>
-        next(Resume(Ok(scope.delete(context))))
+      return (yield Do(
+        ({ next, scope }) => next(Resume(Ok(scope.delete(context)))),
+        `delete(${name})`,
       )) as boolean;
     },
     *with<R>(value: T, operation: (value: T) => Operation<R>): Operation<R> {
