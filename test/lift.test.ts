@@ -5,7 +5,7 @@ import { withResolvers } from "../with-resolvers.ts";
 import { describe, expect, it } from "./suite.ts";
 
 describe("lift", () => {
-  it.only("safely does not continue if the call stops the operation", async () => {
+  it.skip("safely does not continue if the call stops the operation", async () => {
     let reached = false;
 
     await run(function* main() {

@@ -1,7 +1,9 @@
-import { Routine } from "./contexts.ts";
+import { Parent, Routine } from "./contexts.ts";
+import { Do, Resume } from "./control.ts";
+import { Ok } from "./result.ts";
 import { createCoroutine } from "./coroutine.ts";
-import { createFutureWithResolvers, doAndWait } from "./future.ts";
-import { Coroutine, Operation, Scope, Task } from "./types.ts";
+import { createFutureWithResolvers } from "./future.ts";
+import { Coroutine, Future, Operation, Scope, Task } from "./types.ts";
 
 export interface TaskOptions<T> {
   operation(): Operation<T>;
@@ -39,12 +41,16 @@ export function createTask<T>(options: TaskOptions<T>): [Task<T>, Coroutine] {
   scope.set(Routine, routine);
 
   let halt = () =>
-    doAndWait(() => {
-      if (!halted) {
-        halted = true;
-        routine.next(routine.stack.haltInstruction);
-      }
-    }, finalized.future);
+    toFuture(function* halt() {
+      yield Do(({ next, stack }) => {
+        if (!halted) {
+          halted = true;
+          routine.next(stack.haltInstruction);
+        }
+        next(Resume(Ok()));
+      }, "halt");
+      yield* finalized.future;
+    }, scope.expect(Parent));
 
   let task: Task<T> = Object.create(result.future, {
     [Symbol.toStringTag]: {
@@ -58,4 +64,22 @@ export function createTask<T>(options: TaskOptions<T>): [Task<T>, Coroutine] {
   });
 
   return [task, routine];
+}
+
+function toFuture<T>(op: () => Operation<T>, scope: Scope): Future<T> {
+  let _task: Task<T> | void;
+  let task = () => _task ?? (_task = scope.run(op));
+  return {
+    [Symbol.toStringTag]: "Future",
+    [Symbol.iterator]: () => op()[Symbol.iterator](),
+    then: (fn, ...args) => {
+      if (fn) {
+        return task().then((...x) => fn(...x), ...args);
+      } else {
+        return task().then(fn, ...args);
+      }
+    },
+    catch: (...args) => task().catch(...args),
+    finally: (...args) => task().catch(...args),
+  } as Future<T>;
 }
