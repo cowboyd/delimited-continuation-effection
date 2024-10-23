@@ -1,12 +1,5 @@
 import { describe, expect, it } from "./suite.ts";
-import {
-  createQueue,
-  each,
-  resource,
-  run,
-  spawn,
-  Stream,
-} from "../mod.ts";
+import { createQueue, each, resource, run, spawn, Stream } from "../mod.ts";
 
 describe("each", () => {
   it("can be used to iterate a stream", async () => {
