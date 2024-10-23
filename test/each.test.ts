@@ -4,7 +4,6 @@ import {
   each,
   resource,
   run,
-  sleep,
   spawn,
   Stream,
 } from "../mod.ts";
