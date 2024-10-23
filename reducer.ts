@@ -1,60 +1,64 @@
-import { Instruction } from "./control.ts";
-import { serialize } from "./serializable.ts";
-import { Coroutine } from "./types.ts";
+import { createContext } from "./context.ts";
+import { Err, Ok, Result } from "./result.ts";
+import { Coroutine, Subscriber } from "./types.ts";
 
 export class Reducer {
   reducing = false;
-  readonly queue: [number, Coroutine, Instruction][] = [];
+  readonly queue = createPriorityQueue();
 
-  reduce = (routine: Coroutine, instruction: Instruction, priority: number) => {
+  reduce = (
+    thunk: Thunk,
+  ) => {
     let { queue } = this;
-    logEnqueue([priority, routine, instruction], queue);
-    let index = queue.findIndex(([p]) => p > priority);
-    if (index === -1) {
-      queue.push([priority, routine, instruction]);
-    } else {
-      queue.splice(index, 0, [priority, routine, instruction]);
-    }
+
+    queue.enqueue(thunk);
+
     if (this.reducing) return;
 
     try {
       this.reducing = true;
 
-      let item = queue.shift();
+      let item = queue.dequeue();
       while (item) {
-        log(item, queue);
-        [, routine, instruction] = item;
-        const iterator = routine.instructions();
-
-        if (instruction.method === "resume") {
-          let result = instruction.result;
+        let [, routine, result, notify, method = "next" as const] = item;
+        try {
+          notify({ done: false, value: result });
+          const iterator = routine.data.iterator;
           if (result.ok) {
-            let next = iterator.next(result.value);
-            if (!next.done) {
-              routine.next(next.value);
+            if (method === "next") {
+              let next = iterator.next(result.value);
+              if (next.done) {
+                notify({ done: true, value: Ok(next.value) });
+              } else {
+                let action = next.value;
+                routine.data.discard = action.enter(routine.next, routine);
+              }
+            } else if (iterator.return) {
+              let next = iterator.return(result.value);
+              if (next.done) {
+                notify({ done: true, value: Ok(result) });
+              } else {
+                let action = next.value;
+                routine.data.discard = action.enter(routine.next, routine);
+              }
+            } else {
+              notify({ done: true, value: result });
             }
           } else if (iterator.throw) {
             let next = iterator.throw(result.error);
-            if (!next.done) {
-              routine.next(next.value);
+            if (next.done) {
+              notify({ done: true, value: Ok(next.value) });
+            } else {
+              let action = next.value;
+              routine.data.discard = action.enter(routine.next, routine);
             }
           } else {
             throw result.error;
           }
-        } else if (instruction.method === "break") {
-          routine.stack.setExitWith(instruction.instruction);
-
-          if (iterator.return) {
-            let next = iterator.return();
-            if (!next.done) {
-              routine.next(next.value);
-            }
-          }
-        } else if (instruction.method === "do") {
-          instruction.fn(routine);
+        } catch (error) {
+          notify({ done: true, value: Err(error) });
         }
-
-        item = queue.shift();
+        item = queue.dequeue();
       }
     } finally {
       this.reducing = false;
@@ -62,34 +66,37 @@ export class Reducer {
   };
 }
 
-Deno.truncateSync("instruction.log");
+export const ReducerContext = createContext<Reducer>(
+  "@effection/reducer",
+  new Reducer(),
+);
 
-function log(thunk: Thunk, queue: Thunk[]) {
-  Deno.writeTextFileSync(
-    "instruction.log",
-    `${JSON.stringify(toJSON(thunk))} <-- ${
-      JSON.stringify(queue.map(toJSON))
-    }\n-------------\n`,
-    { append: true, create: true },
-  );
-}
+type Thunk = [
+  number,
+  Coroutine<unknown>,
+  Result<unknown>,
+  Subscriber<unknown>,
+  "return" | "next",
+];
 
-function logEnqueue(thunk: Thunk, queue: Thunk[]) {
-  Deno.writeTextFileSync(
-    "instruction.log",
-    `${JSON.stringify(toJSON(thunk))} --> ${
-      JSON.stringify(queue.map(toJSON))
-    }\n`,
-    { append: true, create: true },
-  );
-}
+// This is a pretty hokey priority queue that uses an array for storage
+// so enqueue is O(n). However, `n` is generally small. revisit.
+function createPriorityQueue() {
+  let thunks: Thunk[] = [];
 
-type Thunk = [number, Coroutine, Instruction];
-
-function toJSON([p, routine, instruction]: Thunk) {
   return {
-    p,
-    ...serialize(instruction) as object,
-    on: routine.id,
+    enqueue(thunk: Thunk): void {
+      let [priority] = thunk;
+      let index = thunks.findIndex(([p]) => p >= priority);
+      if (index === -1) {
+        thunks.push(thunk);
+      } else {
+        thunks.splice(index, 0, thunk);
+      }
+    },
+
+    dequeue(): Thunk | undefined {
+      return thunks.shift();
+    },
   };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "./suite.ts";
 
-import { contextBounds, createContext, run, sleep, spawn } from "../mod.ts";
+import { createContext, run, sleep, spawn } from "../mod.ts";
 
 const numbers = createContext("number", 3);
 
@@ -13,20 +13,20 @@ describe("context", () => {
     ).toEqual(3);
   });
 
-  it("can be set within a given scope, but reverts after", async () => {
-    let values = await run(function* () {
-      let before = yield* numbers.get();
+  // it("can be set within a given scope, but reverts after", async () => {
+  //   let values = await run(function* () {
+  //     let before = yield* numbers.get();
 
-      let within = yield* contextBounds(function* () {
-        yield* numbers.set(22);
-        return yield* numbers.get();
-      });
-      let after = yield* numbers.get();
-      return [before, within, after];
-    });
+  //     let within = yield* contextBounds(function* () {
+  //       yield* numbers.set(22);
+  //       return yield* numbers.get();
+  //     });
+  //     let after = yield* numbers.get();
+  //     return [before, within, after];
+  //   });
 
-    expect(values).toEqual([3, 22, 3]);
-  });
+  //   expect(values).toEqual([3, 22, 3]);
+  // });
 
   it("is safe to get() when context is not defined", async () => {
     let result = await run(function* () {

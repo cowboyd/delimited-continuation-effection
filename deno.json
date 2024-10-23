@@ -1,36 +1,12 @@
 {
   "lock": false,
   "tasks": {
-    "test": "deno test --allow-run=deno",
-    "test:node": "deno task build:npm 0.0.0 && node test/main/node.mjs hello world",
-    "build:npm": "deno run -A tasks/build-npm.ts"
+    "test": "deno test --allow-run=deno"
   },
   "lint": {
     "rules": {
       "exclude": ["prefer-const", "require-yield", "no-unsafe-finally"]
-    },
-    "exclude": [
-      "build",
-      "website",
-      "www",
-      "packages"
-    ]
-  },
-  "fmt": {
-    "exclude": [
-      "build",
-      "website",
-      "www",
-      "packages",
-      "CODE_OF_CONDUCT.md",
-      "README.md"
-    ]
-  },
-  "test": {
-    "exclude": [
-      "build",
-      "packages"
-    ]
+    }
   },
   "compilerOptions": {
     "lib": [

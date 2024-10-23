@@ -1,36 +1,33 @@
-import { controlBounds, useCoroutine } from "./coroutine.ts";
-import { Break, Do, Resume } from "./control.ts";
-import { Children, Generation, Parent, Routine } from "./contexts.ts";
-import { Err, Ok } from "./result.ts";
-
+import { Children, Generation } from "./contexts.ts";
+import { Action, Context, Future, Operation, Scope, Task } from "./types.ts";
+import { Err, Ok, unbox } from "./result.ts";
 import { createTask } from "./task.ts";
-import type { Context, Coroutine, Operation, Scope, Task } from "./types.ts";
-import { TaskGroup } from "./task-group.ts";
 
 export const [global] = createScopeInternal();
 
-export function createScope(parent = global): [Scope, () => Task<void>] {
+export function createScope(
+  parent: Scope = global,
+): [Scope, () => Future<void>] {
   let [scope, destroy] = createScopeInternal(parent);
   return [scope, () => parent.run(destroy)];
 }
 
-function createScopeInternal(parent?: Scope): [Scope, () => Operation<void>] {
-  let contexts: Record<string, unknown> = parent
-    ? Object.create(cast(parent).contexts)
-    : Object.create(null);
+export function createScopeInternal(
+  parent?: Scope,
+): [ScopeInternal, () => Operation<void>] {
+  let destructors = new Set<() => Operation<void>>();
 
-  let scope = {
-    get<T>(context: Context<T>) {
-      return contexts[context.name] ?? context.defaultValue;
+  let contexts: Record<string, unknown> = Object.create(
+    parent ? (parent as ScopeInternal).contexts : null,
+  );
+  let scope: ScopeInternal = Object.create({
+    [Symbol.toStringTag]: "Scope",
+    contexts,
+    get<T>(context: Context<T>): T | undefined {
+      return (contexts[context.name] ?? context.defaultValue) as T | undefined;
     },
-    set<T>(context: Context<T>, value: T) {
+    set<T>(context: Context<T>, value: T): T {
       return contexts[context.name] = value;
-    },
-    delete(context) {
-      return delete contexts[context.name];
-    },
-    hasOwn(context) {
-      return !!Reflect.getOwnPropertyDescriptor(contexts, context.name);
     },
     expect<T>(context: Context<T>): T {
       let value = scope.get(context);
@@ -41,128 +38,68 @@ function createScopeInternal(parent?: Scope): [Scope, () => Operation<void>] {
       }
       return value;
     },
-    *spawn<T>(operation: () => Operation<T>): Operation<Task<T>> {
-      let task = yield Do((routine) => {
-        let [task, child] = spawnTask(scope, operation);
-        routine.next(Resume(Ok(task)));
-        child.next(Resume(Ok()));
-      }, { spawn: operation.name ?? "anonymous" });
-
-      return task as Task<T>;
+    delete<T>(context: Context<T>): boolean {
+      return delete contexts[context.name];
+    },
+    hasOwn<T>(context: Context<T>): boolean {
+      return !!Reflect.getOwnPropertyDescriptor(contexts, context.name);
     },
     run<T>(operation: () => Operation<T>): Task<T> {
-      let [task, routine] = spawnTask(scope, operation);
-
-      routine.next(Resume(Ok()));
+      let { task, start } = createTask({ operation, owner: scope });
+      start();
       return task;
     },
-
-    *eval<T>(operation: () => Operation<T>): Operation<T> {
-      let routine = yield* useCoroutine();
-      let originalScope = routine.scope;
-      try {
-        routine.scope = scope;
-        return yield* operation();
-      } finally {
-        routine.scope = originalScope;
-      }
+    spawn<T>(operation: () => Operation<T>): Operation<Task<T>> {
+      return {
+        *[Symbol.iterator]() {
+          let { task, start } = createTask({ operation, owner: scope });
+          start();
+          return task;
+        },
+      };
     },
-    contexts,
-  } as Scope;
 
-  scope.set(Children, new Map());
+    ensure(op: () => Operation<void>): () => void {
+      destructors.add(op);
+      return () => destructors.delete(op);
+    },
+  });
 
-  if (parent) {
-    scope.set(Parent, parent);
-    scope.set(Generation, parent.expect(Generation) + 1);
-    parent.expect(Children).set(scope, destroy);
-  } else {
-    scope.set(Generation, 0);
-  }
-  parent?.expect(Children).set(scope, destroy);
+  scope.set(Generation, scope.expect(Generation) + 1);
+  scope.set(Children, new Set());
+  parent?.expect(Children).add(scope);
+
+  let unbind = parent ? (parent as ScopeInternal).ensure(destroy) : () => {};
 
   function* destroy(): Operation<void> {
-    scope.expect(Parent).expect(Children).delete(scope);
-    yield* TaskGroup.halt(scope);
-
-    let children = scope.expect(Children);
-    for (let [, destroy] of children) {
-      yield* destroy();
+    parent?.expect(Children).delete(scope);
+    unbind();
+    let outcome = Ok();
+    for (let destructor of [...destructors].reverse()) {
+      try {
+        destructors.delete(destructor);
+        yield* destructor();
+      } catch (error) {
+        outcome = Err(error);
+      }
     }
+    unbox(outcome);
   }
 
-  return [scope, () => destroy()];
+  return [scope, destroy];
+}
+
+export interface ScopeInternal extends Scope {
+  contexts: Record<string, unknown>;
+  ensure(op: () => Operation<void>): () => void;
 }
 
 export function* useScope(): Operation<Scope> {
-  let routine = yield* useCoroutine();
-  return routine.scope;
-}
-
-export function* contextBounds<T>(op: () => Operation<T>): Operation<T> {
-  let scope = yield* useScope();
-  let [child, destroy] = createScopeInternal(scope);
-  try {
-    return yield* child.eval(op);
-  } finally {
-    yield* destroy();
-  }
-}
-
-function cast(scope: Scope): Scope & { contexts: Record<string, unknown> } {
-  return scope as Scope & { contexts: Record<string, unknown> };
-}
-
-interface Transfer {
-  from: Scope;
-  to: Scope;
-}
-
-export function transfer({ from, to }: Transfer): void {
-  TaskGroup.transfer(from, to);
-
-  let toChildren = to.expect(Children);
-  let fromChildren = from.expect(Children);
-
-  for (let [child, destructor] of fromChildren) {
-    fromChildren.delete(child);
-    child.set(Parent, to);
-    child.set(Generation, to.expect(Generation) + 1);
-    toChildren.set(child, destructor);
-    Object.setPrototypeOf(cast(child).contexts, cast(to).contexts);
-  }
-}
-
-function spawnTask<T>(
-  scope: Scope,
-  operation: () => Operation<T>,
-): [Task<T>, Coroutine] {
-  let [child, destroy] = createScopeInternal(scope);
-
-  let tasks = TaskGroup.ensureOwn(scope);
-
-  let [task, routine] = createTask({
-    scope: child,
-    *operation() {
-      return yield* controlBounds(function* () {
-        try {
-          return yield* operation();
-        } catch (error) {
-          scope.get(Routine)?.next(Break(Resume(Err(error))));
-          throw error;
-        } finally {
-          if (typeof task !== "undefined") {
-            tasks.delete(task);
-          }
-          let parent = child.get(Parent);
-          let adopted = parent !== scope;
-          if (!adopted) {
-            yield* destroy();
-          }
-        }
-      });
+  return (yield {
+    description: `useScope()`,
+    enter(resolve, { scope }) {
+      resolve(Ok(scope));
+      return (resolve) => resolve(Ok());
     },
-  });
-  tasks.add(task);
-  return [task, routine];
+  } as Action<Scope>) as Scope;
 }

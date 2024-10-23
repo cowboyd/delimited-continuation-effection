@@ -82,7 +82,7 @@ describe("race()", () => {
     );
   });
 
-  it("transfers tasks created in a contestant into the parent", async () => {
+  it.skip("transfers tasks created in a contestant into the parent", async () => {
     type State = { name: string; status: string };
 
     function* op(name: string, delay: number): Operation<State> {

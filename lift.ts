@@ -1,5 +1,4 @@
-import { Do, Resume } from "./control.ts";
-import { Err, Ok } from "./result.ts";
+import { action } from "./action.ts";
 import { type Operation } from "./types.ts";
 
 /**
@@ -21,16 +20,13 @@ export function lift<TArgs extends unknown[], TReturn>(
   fn: (...args: TArgs) => TReturn,
 ): (...args: TArgs) => Operation<TReturn> {
   return (...args: TArgs) => {
-    return {
-      *[Symbol.iterator]() {
-        return (yield Do((routine) => {
-          try {
-            routine.next(Resume(Ok(fn(...args))));
-          } catch (error) {
-            routine.next(Resume(Err(error)));
-          }
-        }, "lift")) as TReturn;
-      },
-    };
+    return action((resolve, reject) => {
+      try {
+        resolve(fn(...args));
+      } catch (error) {
+        reject(error);
+      }
+      return () => {};
+    });
   };
 }

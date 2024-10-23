@@ -1,8 +1,6 @@
 import type { Operation, Task, Yielded } from "./types.ts";
-import { scoped } from "./scoped.ts";
 import { spawn } from "./spawn.ts";
-import { withResolvers } from "./with-resolvers.ts";
-import { race } from "./race.ts";
+import { encapsulate, trap } from "./task.ts";
 
 /**
  * Block and wait for all of the given operations to complete. Returns
@@ -32,31 +30,20 @@ import { race } from "./race.ts";
 export function* all<T extends readonly Operation<unknown>[] | []>(
   ops: T,
 ): Operation<All<T>> {
-  let { operation: failure, reject: fail } = withResolvers<All<T>>();
+  return yield* trap(() =>
+    encapsulate(function* (): Operation<All<T>> {
+      let tasks: Task<unknown>[] = [];
 
-  let evaluate = scoped(function* (): Operation<All<T>> {
-    let tasks: Task<unknown>[] = [];
-
-    for (let operation of ops) {
-      tasks.push(
-        yield* spawn(function* () {
-          try {
-            let value = yield* operation;
-            return value;
-          } catch (error) {
-            fail(error);
-          }
-        }),
-      );
-    }
-    let results = [];
-    for (let task of tasks) {
-      results.push(yield* task);
-    }
-    return results as All<T>;
-  });
-
-  return yield* race([failure, evaluate]);
+      for (let operation of ops) {
+        tasks.push(yield* spawn(() => operation));
+      }
+      let results = [];
+      for (let task of tasks) {
+        results.push(yield* task);
+      }
+      return results as All<T>;
+    })
+  );
 }
 
 /**

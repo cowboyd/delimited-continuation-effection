@@ -25,7 +25,7 @@ export function call<T, TArgs extends unknown[] = []>(
         return action<T>(function wait(resolve, reject) {
           target.then(resolve, reject);
           return () => {};
-        })[Symbol.iterator]();
+        }, `async call ${callable.name}()`)[Symbol.iterator]();
       } else if (isOperation<T>(target)) {
         return target[Symbol.iterator]();
       } else {
