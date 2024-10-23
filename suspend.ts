@@ -1,10 +1,6 @@
-import type { Operation } from "./types.ts";
-import { Do } from "./control.ts";
+import { action } from "./action.ts";
+import { Operation } from "./types.ts";
 
 export function suspend(): Operation<void> {
-  return {
-    *[Symbol.iterator]() {
-      yield Do(() => {});
-    },
-  };
+  return action(() => () => {}, "suspend");
 }

@@ -9,6 +9,9 @@ export type Result<T> = {
 export function Ok(): Result<void>;
 export function Ok<T>(value: T): Result<T>;
 export function Ok<T>(value?: T): Result<T | undefined> {
+  if (typeof value === "undefined") {
+    return { ok: true } as Result<T>;
+  }
   return ({ ok: true, value });
 }
 

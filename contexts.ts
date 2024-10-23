@@ -1,15 +1,15 @@
 import { createContext } from "./context.ts";
-import { Reducer } from "./reducer.ts";
-import type { Coroutine, Operation, Scope } from "./types.ts";
+import { Coroutine, Scope } from "./types.ts";
 
-const { reduce } = new Reducer();
+export const Routine = createContext<Coroutine<unknown>>(
+  "@effection/coroutine",
+);
 
-export const Routine = createContext<Coroutine>("@effection/coroutine");
+export const Generation = createContext<number>(
+  "@effection/scope.generation",
+  0,
+);
 
-export const Reduce = createContext<typeof reduce>("@effection/reduce", reduce);
-
-export const Parent = createContext<Scope>("@effection/scope.parent");
-
-export const Children = createContext<Children>("@effection/scope.children");
-
-type Children = Map<Scope, () => Operation<void>>;
+export const Children = createContext<Set<Scope>>(
+  "@effection/scope.children",
+);

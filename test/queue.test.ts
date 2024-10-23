@@ -47,16 +47,5 @@ describe("Queue", () => {
 });
 
 function abortAfter<T>(op: Operation<T>, ms: number): Operation<T | void> {
-  // return action(function* (resolve, reject) {
-  //   yield* spawn(function* () {
-  //     try {
-  //       resolve(yield* op);
-  //     } catch (error) {
-  //       reject(error);
-  //     }
-  //   });
-  //   yield* sleep(ms);
-  //   resolve();
-  // });
   return race([op, sleep(ms)]);
 }

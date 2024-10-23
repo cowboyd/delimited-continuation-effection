@@ -1,33 +1,34 @@
-import type { Operation, Reject, Resolve } from "./types.ts";
-import { Do, Resume } from "./control.ts";
-import { Err, Ok, Result } from "./result.ts";
+import { Err, Ok } from "./result.ts";
+import { Effect, Operation } from "./types.ts";
 
-export interface Resolver<T> {
-  (resolve: Resolve<T>, reject: Reject): () => void;
+interface Resolver<T> {
+  (resolve: (value: T) => void, reject: (error: Error) => void): () => void;
 }
 
-export function action<T>(resolver: Resolver<T>): Operation<T> {
+export function action<T>(resolver: Resolver<T>, desc?: string): Operation<T> {
   return {
     *[Symbol.iterator]() {
-      let exit = () => {};
-      try {
-        let value = yield Do(({ next }) => {
-          let settle = (result: Result<unknown>) => {
-            settle = () => {};
-            next(Resume(result));
+      let action: Effect<T> = {
+        description: desc ?? "action",
+        enter: (settle) => {
+          let resolve = (value: T) => {
+            settle(Ok(value));
           };
-          let resolve = (value: unknown) => settle(Ok(value));
-          let reject = (error: Error) => settle(Err(error));
-          try {
-            exit = resolver(resolve, reject) ?? (() => {});
-          } catch (error) {
-            next(Resume(Err(error)));
-          }
-        });
-        return value as T;
-      } finally {
-        exit();
-      }
+          let reject = (error: Error) => {
+            settle(Err(error));
+          };
+          let discard = resolver(resolve, reject);
+          return (discarded) => {
+            try {
+              discard();
+              discarded(Ok());
+            } catch (error) {
+              discarded(Err(error));
+            }
+          };
+        },
+      };
+      return (yield action) as T;
     },
   };
 }
