@@ -1,4 +1,4 @@
-import { Action, Context, Operation, Scope } from "./types.ts";
+import { Context, Effect, Operation, Scope } from "./types.ts";
 import { Ok } from "./result.ts";
 import { useScope } from "./scope.ts";
 
@@ -48,7 +48,7 @@ const Expect = <T>(context: Context<T>) =>
 const Delete = <T>(context: Context<T>) =>
   UseScope((scope) => scope.expect(context), `delete(${context.name})`);
 
-function UseScope<T>(fn: (scope: Scope) => T, description: string): Action<T> {
+function UseScope<T>(fn: (scope: Scope) => T, description: string): Effect<T> {
   return {
     description,
     enter: (resolve, { scope }) => {

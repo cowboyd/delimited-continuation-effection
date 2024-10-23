@@ -1,5 +1,5 @@
 import { Children, Generation } from "./contexts.ts";
-import { Action, Context, Future, Operation, Scope, Task } from "./types.ts";
+import { Context, Effect, Future, Operation, Scope, Task } from "./types.ts";
 import { Err, Ok, unbox } from "./result.ts";
 import { createTask } from "./task.ts";
 
@@ -101,5 +101,5 @@ export function* useScope(): Operation<Scope> {
       resolve(Ok(scope));
       return (resolve) => resolve(Ok());
     },
-  } as Action<Scope>) as Scope;
+  } as Effect<Scope>) as Scope;
 }

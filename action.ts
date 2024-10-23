@@ -1,5 +1,5 @@
 import { Err, Ok } from "./result.ts";
-import { Action, Operation } from "./types.ts";
+import { Effect, Operation } from "./types.ts";
 
 interface Resolver<T> {
   (resolve: (value: T) => void, reject: (error: Error) => void): () => void;
@@ -8,7 +8,7 @@ interface Resolver<T> {
 export function action<T>(resolver: Resolver<T>, desc?: string): Operation<T> {
   return {
     *[Symbol.iterator]() {
-      let action: Action<T> = {
+      let action: Effect<T> = {
         description: desc ?? "action",
         enter: (settle) => {
           let resolve = (value: T) => {

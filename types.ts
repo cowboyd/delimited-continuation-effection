@@ -1,7 +1,7 @@
 import type { Result } from "./result.ts";
 
 export interface Operation<T> {
-  [Symbol.iterator](): Iterator<Action<unknown>, T, unknown>;
+  [Symbol.iterator](): Iterator<Effect<unknown>, T, unknown>;
 }
 
 export interface Future<T> extends Operation<T>, Promise<T> {}
@@ -44,7 +44,7 @@ export interface Resolve<T> {
   (value: T): void;
 }
 
-export interface Action<T> {
+export interface Effect<T> {
   description: string;
   enter(
     resolve: Resolve<Result<T>>,
@@ -56,7 +56,7 @@ export interface Coroutine<T = unknown> {
   scope: Scope;
   data: {
     discard(resolve: Resolve<Result<unknown>>): void;
-    iterator: Iterator<Action<unknown>, T, unknown>;
+    iterator: Iterator<Effect<unknown>, T, unknown>;
   };
   next(result: Result<unknown>, subscriber?: Subscriber<T>): () => void;
   return<R>(result: Result<R>, subcriber?: Subscriber<void>): () => void;
